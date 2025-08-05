@@ -1,16 +1,19 @@
 
 import * as e from 'firebase-admin';
 
-// Las credenciales del Admin SDK se leen desde las variables de entorno
-// Asegúrate de que tu archivo .env.local o las variables de tu entorno de despliegue estén configuradas.
-const privateKey = (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n');
-const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+// Helper function to initialize the admin app, ensuring it's only done once.
+function initializeAdminApp() {
+  if (e.apps.length > 0) {
+    return e.app();
+  }
 
-if (e.apps.length === 0) {
+  const privateKey = (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n');
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+
   if (projectId && clientEmail && privateKey) {
     try {
-      e.initializeApp({
+      return e.initializeApp({
         credential: e.credential.cert({
           projectId,
           clientEmail,
@@ -18,27 +21,31 @@ if (e.apps.length === 0) {
         }),
         databaseURL: `https://${projectId}.firebaseio.com`,
       });
-    } catch (error) {
-      console.error('Firebase Admin SDK Initialization Error:', error);
+    } catch (error: any) {
+      console.error('Firebase Admin SDK Initialization Error:', error.message);
+      // We don't throw here, so getSafeFirestore/getSafeAuth will throw a clearer error.
+      return null;
     }
   } else {
-    // Este mensaje se mostrará en el servidor si faltan las credenciales.
-    console.warn('Firebase Admin SDK no se ha inicializado. Faltan variables de entorno (FIREBASE_PRIVATE_KEY, FIREBASE_CLIENT_EMAIL, NEXT_PUBLIC_FIREBASE_PROJECT_ID). Las funciones de administrador no estarán disponibles.');
+    console.warn('Firebase Admin SDK credentials are not set in .env.local. Admin features will not be available.');
+    return null;
   }
 }
 
-// Helper para obtener instancias de forma segura.
-// Si la inicialización falló, usar estas funciones lanzará un error claro.
+// Helper to get Firestore instance safely.
 function getSafeFirestore(): e.firestore.Firestore {
+  initializeAdminApp(); // Ensure app is initialized
   if (!e.apps.length) {
-    throw new Error("Attempted to use Firestore, but Firebase Admin SDK is not initialized.");
+    throw new Error("Attempted to use Firestore, but Firebase Admin SDK is not initialized. Check your server logs for the original initialization error.");
   }
   return e.firestore();
 }
 
+// Helper to get Auth instance safely.
 function getSafeAuth(): e.auth.Auth {
+    initializeAdminApp(); // Ensure app is initialized
     if (!e.apps.length) {
-        throw new Error("Attempted to use Auth, but Firebase Admin SDK is not initialized.");
+        throw new Error("Attempted to use Auth, but Firebase Admin SDK is not initialized. Check your server logs for the original initialization error.");
     }
     return e.auth();
 }
