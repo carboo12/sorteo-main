@@ -1,36 +1,20 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper function to check for superuser
-    function isSuperuser() {
-      return request.auth.token.email == 'carboo12@gmail.com';
+  
+    // Default deny all
+    match /{document=**} {
+      allow read, write: if false;
     }
 
-    // Superusers can manage all businesses
-    match /businesses/{businessId} {
-      allow read, write: if isSuperuser();
-    }
-
-    // Users can read/update their own user document. Only superusers can create/delete users.
+    // Users can read/write their own user document
     match /users/{userId} {
-      allow read, update: if request.auth.uid == userId;
-      allow create, delete: if isSuperuser();
+      allow read, update: if request.auth != null && request.auth.uid == userId;
     }
 
-    // Raffle data can be accessed by users belonging to that business. Superusers can access all.
-    match /businesses/{businessId}/raffles/{raffleId} {
-       allow read, write: if isSuperuser() || 
-                         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-                          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == businessId);
+    // Allow authenticated users to read and write to their own business's raffle data
+    match /businesses/{businessId}/{document=**} {
+      allow read, write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == businessId;
     }
-
-    // Winning history is managed internally by draws. Access rules mirror raffles.
-     match /businesses/{businessId}/winningHistory/{monthId} {
-        allow read, write: if isSuperuser() || 
-                         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-                          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == businessId);
-     }
   }
 }

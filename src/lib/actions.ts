@@ -15,7 +15,8 @@ import {
   addDoc,
   query,
 } from 'firebase/firestore';
-import { getFirestore } from './firebase';
+import { getFirestore } from './firebase'; // For client-side rules if needed in future
+import { firestore as adminFirestore } from './firebase-admin'; // Admin SDK for privileged actions
 import { selectWinningNumber } from '@/ai/flows/select-winning-number';
 import type { TurnoData, Winner, Ticket, TurnoInfo, Business, Location } from './types';
 
@@ -69,7 +70,7 @@ export async function buyTicket(
     return { success: false, message: "Business ID no encontrado." };
   }
   try {
-    const db = await getFirestore();
+    const db = await getFirestore(); // Use client-side SDK for user-initiated actions respecting rules
     const raffleDocRef = doc(db, 'businesses', businessId, 'raffles', date);
 
     await runTransaction(db, async (transaction) => {
@@ -230,13 +231,12 @@ export async function createBusiness(
     data: Omit<Business, 'id' | 'createdAt'>
 ): Promise<{ success: boolean; message: string; businessId?: string }> {
     try {
-        const db = await getFirestore();
         const businessData = {
             ...data,
             licenseExpiresAt: Timestamp.fromDate(new Date(data.licenseExpiresAt)),
-            createdAt: serverTimestamp()
+            createdAt: Timestamp.now()
         };
-        const docRef = await addDoc(collection(db, "businesses"), businessData);
+        const docRef = await adminFirestore.collection("businesses").add(businessData);
         return { success: true, message: "Negocio creado con éxito", businessId: docRef.id };
     } catch (error: any) {
         console.error("Error creating business:", error);
@@ -246,10 +246,8 @@ export async function createBusiness(
 
 export async function getBusinesses(): Promise<Business[]> {
     try {
-        const db = await getFirestore();
-        const businessesRef = collection(db, 'businesses');
-        const q = query(businessesRef);
-        const querySnapshot = await getDocs(q);
+        const businessesRef = adminFirestore.collection('businesses');
+        const querySnapshot = await businessesRef.get();
         return querySnapshot.docs.map(doc => {
             const data = doc.data();
             return {
