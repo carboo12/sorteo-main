@@ -1,3 +1,9 @@
+import RaffleClient from '@/components/raffle-client';
+
 export default function Home() {
-  return <></>;
+  return (
+    <main>
+      <RaffleClient />
+    </main>
+  );
 }
