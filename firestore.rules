@@ -4,19 +4,35 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Allow superuser to do anything
+    match /{document=**} {
+      allow read, write: if request.auth != null && request.auth.token.email == 'carboo12@gmail.com';
+    }
+
     // Users can read their own user document
     match /users/{userId} {
-      allow read: if request.auth != null && request.auth.uid == userId;
-      // Allow superuser to create/update users.
-      // For now, any authenticated user can create a user doc for themselves
-      // This will be locked down later.
-      allow write: if request.auth != null; 
+      allow get: if request.auth != null && request.auth.uid == userId;
+      // Allow superuser to create/update users
+      allow write: if request.auth != null && request.auth.token.email == 'carboo12@gmail.com';
+    }
+
+    // Rules for the businesses collection itself
+    match /businesses/{businessId} {
+      // Any authenticated user that belongs to a business can read it
+      allow get: if request.auth != null &&
+                   exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+                   get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == businessId;
+      
+      // Superuser can create, update, and delete businesses
+      allow write: if request.auth != null && request.auth.token.email == 'carboo12@gmail.com';
     }
     
-    // Rules for businesses and their sub-collections
-    match /businesses/{businessId}/{document=**} {
-        // Only authenticated users belonging to the business can access its data.
-        allow read, write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == businessId;
+    // Business-specific subcollections
+    match /businesses/{businessId}/{subcollection}/{documentId} {
+        // Only authenticated users assigned to the business can read/write its data
+        allow read, write: if request.auth != null &&
+                           exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+                           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == businessId;
     }
   }
 }
