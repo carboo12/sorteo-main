@@ -1,38 +1,40 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Allow superuser to do anything
-    match /{document=**} {
-      allow read, write: if request.auth != null && request.auth.token.email == 'carboo12@gmail.com';
+    // Helper function to check for superuser role
+    function isSuperuser() {
+      // Check if the user is authenticated and their email matches the superuser email.
+      return request.auth != null && request.auth.token.email == 'carboo12@gmail.com';
     }
 
-    // Users can read their own user document
-    match /users/{userId} {
-      allow get: if request.auth != null && request.auth.uid == userId;
-      // Allow superuser to create/update users
-      allow write: if request.auth != null && request.auth.token.email == 'carboo12@gmail.com';
-    }
-
-    // Rules for the businesses collection itself
+    // Rules for the 'businesses' collection
     match /businesses/{businessId} {
-      // Any authenticated user that belongs to a business can read it
-      allow get: if request.auth != null &&
-                   exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-                   get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == businessId;
+      // Superuser can create, read, update, and delete any business document.
+      allow read, update, delete: if isSuperuser();
+      // Superuser can list all businesses.
+      allow list: if isSuperuser();
+       // Superuser can create new businesses.
+      allow create: if isSuperuser();
       
-      // Superuser can create, update, and delete businesses
-      allow write: if request.auth != null && request.auth.token.email == 'carboo12@gmail.com';
+      // Rules for raffles subcollection within a business
+      match /raffles/{raffleId} {
+        // Authenticated users assigned to this business can read its raffles.
+        allow read: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == businessId;
+        // Allow writes only through specific server-side actions (implicitly handled by server logic)
+        allow write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == businessId;
+      }
     }
-    
-    // Business-specific subcollections
-    match /businesses/{businessId}/{subcollection}/{documentId} {
-        // Only authenticated users assigned to the business can read/write its data
-        allow read, write: if request.auth != null &&
-                           exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-                           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == businessId;
+
+    // Rules for the 'users' collection
+    match /users/{userId} {
+      // Allow a user to read their own document.
+      allow read: if request.auth != null && request.auth.uid == userId;
+      // Allow superuser to read any user document.
+      allow read: if isSuperuser();
+      // Allow superuser to write to any user document.
+      allow write: if isSuperuser();
     }
   }
 }
