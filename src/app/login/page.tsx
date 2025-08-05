@@ -8,8 +8,24 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { signInWithEmailAndGetToken } from '@/lib/auth-client';
 import { Loader2, LogIn } from 'lucide-react';
+import { getApp, getApps, initializeApp } from 'firebase/app';
+import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
+
+// Configuración de Firebase directamente en el cliente
+const firebaseConfig = {
+    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+};
+
+// Inicializar Firebase
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+const auth = getAuth(app);
+
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -21,20 +37,34 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+
+    if (!firebaseConfig.apiKey) {
+        toast({
+            variant: 'destructive',
+            title: 'Error de Configuración',
+            description: 'Las credenciales de Firebase no están configuradas. Revisa tu archivo .env.local.',
+        });
+        setIsLoading(false);
+        return;
+    }
+
     try {
-      const result = await signInWithEmailAndGetToken(email, password);
-      if (result.success) {
-        toast({ title: '¡Éxito!', description: 'Has iniciado sesión correctamente.' });
-        document.cookie = `firebaseIdToken=${result.token}; path=/; max-age=3600`; // Set cookie
-        router.push('/dashboard');
-      } else {
-        throw new Error(result.error || 'Error desconocido');
-      }
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const token = await userCredential.user.getIdToken();
+      
+      toast({ title: '¡Éxito!', description: 'Has iniciado sesión correctamente.' });
+      document.cookie = `firebaseIdToken=${token}; path=/; max-age=3600`;
+      router.push('/dashboard');
+
     } catch (error: any) {
+      let errorMessage = 'No se pudo iniciar sesión. Por favor, revisa tus credenciales.';
+      if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
+          errorMessage = 'Correo electrónico o contraseña incorrectos.';
+      }
       toast({
         variant: 'destructive',
         title: 'Error de autenticación',
-        description: error.message || 'No se pudo iniciar sesión. Por favor, revisa tus credenciales.',
+        description: errorMessage,
       });
     } finally {
       setIsLoading(false);
