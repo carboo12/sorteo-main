@@ -1,3 +1,4 @@
+
 'use server';
 
 import {
@@ -15,7 +16,7 @@ import {
   query,
 } from 'firebase/firestore';
 import { firestore as clientFirestore } from './firebase'; // Renamed to avoid confusion
-import { firestore as adminFirestore } from './firebase-admin'; // Admin SDK for privileged actions
+import { adminFirestore } from './firebase-admin'; // Admin SDK for privileged actions
 import { selectWinningNumber } from '@/ai/flows/select-winning-number';
 import type { TurnoData, Winner, Ticket, TurnoInfo, Business, Location } from './types';
 
@@ -231,7 +232,7 @@ export async function createBusiness(
             licenseExpiresAt: Timestamp.fromDate(new Date(data.licenseExpiresAt)),
             createdAt: Timestamp.now()
         };
-        const docRef = await adminFirestore().collection("businesses").add(businessData);
+        const docRef = await adminFirestore.collection("businesses").add(businessData);
         return { success: true, message: "Negocio creado con éxito", businessId: docRef.id };
     } catch (error: any) {
         console.error("Error creating business:", error);
@@ -241,7 +242,7 @@ export async function createBusiness(
 
 export async function getBusinesses(): Promise<Business[]> {
     try {
-        const businessesRef = adminFirestore().collection('businesses');
+        const businessesRef = adminFirestore.collection('businesses');
         const querySnapshot = await businessesRef.get();
         return querySnapshot.docs.map(doc => {
             const data = doc.data();

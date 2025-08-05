@@ -5,37 +5,50 @@ import { getAuth as getFirebaseAuth } from 'firebase/auth';
 import { getFirestore as getFirebaseFirestore } from 'firebase/firestore';
 
 // =================================================================================
-// Las credenciales de Firebase se cargan desde las variables de entorno
-// definidas en el archivo .env.local
+// 🔥 ¡ACCIÓN REQUERIDA! 🔥
+// Rellena estas credenciales con los valores de tu proyecto de Firebase.
+// Puedes encontrarlas en la consola de Firebase:
+// Project Settings > General > Your apps > SDK setup and configuration
 // =================================================================================
 const firebaseConfig = {
-    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,  
-    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,  
-    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,  
-    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,  
-    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID, 
-    measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
+    apiKey: "AIzaSyCOSWahgg7ldlIj1kTaYJy6jFnwmVThwUE",
+    authDomain: "multishop-manager-3x6vw.firebaseapp.com",  
+    projectId: "multishop-manager-3x6vw",  
+    storageBucket: "multishop-manager-3x6vw.firebasestorage.app",
+      messagingSenderId: "900084459529",  
+    appId: "1:900084459529:web:bada387e4da3d34007b0d8",  
+    measurementId: "G-CJLSPD4XY4"  
 };
 
-// Asegúrate de que todas las claves tengan un valor antes de inicializar.
-if (!firebaseConfig.apiKey) {
-    console.error("Error de configuración de Firebase: La API Key no está definida. Por favor, revisa tu archivo .env.local");
-}
+// =================================================================================
+// Código de inicialización
+// =================================================================================
 
-function getAppInstance() {
+let app;
+
+// Verifica si la configuración está completa antes de inicializar.
+if (firebaseConfig.apiKey && firebaseConfig.apiKey !== "TU_API_KEY_AQUI") {
+    // Si la app no está inicializada, la inicializamos.
     if (!getApps().length) {
-        // Solo inicializa si las credenciales están presentes
-        if (firebaseConfig.apiKey) {
-            return initializeApp(firebaseConfig);
-        }
-        // Si no hay API key, lanzamos un error para evitar que la app se rompa en otro lado.
-        throw new Error("No se puede inicializar Firebase: faltan credenciales del cliente.");
+        app = initializeApp(firebaseConfig);
+    } else {
+        // Si ya está inicializada, la obtenemos.
+        app = getApp();
     }
-    return getApp();
+} else {
+    // Si la configuración está incompleta, lanzamos un error claro para el desarrollador.
+    console.error("Error de configuración de Firebase: Por favor, edita `src/lib/firebase.ts` y añade tus credenciales.");
+    // Creamos un objeto proxy para evitar que la app crashee en el servidor,
+    // pero que falle en el cliente para que el error sea visible.
+    app = new Proxy({}, { 
+        get: (target, prop) => {
+            if (prop === '_isInitialized') return false;
+            throw new Error("Firebase no está inicializado. Revisa las credenciales en `src/lib/firebase.ts`.");
+        }
+    }) as any;
 }
 
-const app = getAppInstance();
+
 const auth = getFirebaseAuth(app);
 const firestore = getFirebaseFirestore(app);
 

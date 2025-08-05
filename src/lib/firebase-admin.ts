@@ -1,37 +1,53 @@
+
+'use server';
+
 import * as admin from 'firebase-admin';
 import serviceAccount from '../../service-account.json';
 
-// Inicializamos la app de Firebase Admin solo si no hay ninguna instancia activa
-if (!admin.apps.length) {
-  try {
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount as admin.ServiceAccount),
-    });
-  } catch (error: any) {
-    console.error('Firebase Admin Initialization Error:', error.message);
-    // No lanzar el error aquí para permitir que el servidor se inicie, 
-    // pero los logs mostrarán el problema.
-  }
-}
-
-// Exportamos las instancias de Firestore y Auth para usarlas en otras partes del backend
-const firestore = admin.apps.length ? admin.firestore() : null;
-const auth = admin.apps.length ? admin.auth() : null;
-
-// Funciones seguras para obtener las instancias, lanzarán un error si la inicialización falló.
-function getSafeFirestore() {
-    if (!firestore) {
-        throw new Error("Attempted to use Firestore, but Firebase Admin SDK failed to initialize. Check your server logs and service-account.json.");
+// Esta función se asegura de que el Admin SDK esté inicializado.
+function initializeAdminApp() {
+    // Si ya hay una app inicializada, no hacemos nada.
+    if (admin.apps.length > 0) {
+        return;
     }
-    return firestore;
-}
 
-function getSafeAuth() {
-    if (!auth) {
-        throw new Error("Attempted to use Auth, but Firebase Admin SDK failed to initialize. Check your server logs and service-account.json.");
+    try {
+        // La configuración de la cuenta de servicio se importa directamente del archivo JSON.
+        // Esto evita problemas de formato con las variables de entorno.
+        const serviceAccountInfo = serviceAccount as admin.ServiceAccount;
+
+        admin.initializeApp({
+            credential: admin.credential.cert(serviceAccountInfo),
+        });
+        console.log("Firebase Admin SDK inicializado correctamente.");
+    } catch (error: any) {
+        console.error('Error al inicializar Firebase Admin SDK:', error.message);
+        // El error se muestra en los logs del servidor para facilitar la depuración.
     }
-    return auth;
 }
 
+// Llama a la inicialización al cargar el módulo.
+initializeAdminApp();
 
-export { admin, getSafeFirestore as firestore, getSafeAuth as auth };
+// Exportamos una instancia segura de Firestore.
+// La función lanzará un error claro si la inicialización falló por alguna razón.
+function getSafeFirestore(): admin.firestore.Firestore {
+    if (!admin.apps.length) {
+        throw new Error("Intento de usar Firestore, pero Firebase Admin SDK no se pudo inicializar. Revisa los logs de tu servidor para ver el error original.");
+    }
+    return admin.firestore();
+}
+
+// Exportamos una instancia segura de Auth.
+function getSafeAuth(): admin.auth.Auth {
+    if (!admin.apps.length) {
+        throw new Error("Intento de usar Auth, pero Firebase Admin SDK no se pudo inicializar. Revisa los logs de tu servidor para ver el error original.");
+    }
+    return admin.auth();
+}
+
+// Exportamos las instancias para ser usadas en otras partes del backend.
+const adminFirestore = getSafeFirestore();
+const adminAuth = getSafeAuth();
+
+export { admin, adminFirestore, adminAuth };
