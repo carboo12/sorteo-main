@@ -7,11 +7,14 @@ import serviceAccount from '../../service-account.json';
 // Este enfoque es más robusto y se ejecuta una sola vez cuando el módulo es cargado.
 if (!admin.apps.length) {
   try {
+    // Casting para asegurar que el tipo sea el correcto.
+    const typedServiceAccount = serviceAccount as admin.ServiceAccount;
     admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount as admin.ServiceAccount),
+      credential: admin.credential.cert(typedServiceAccount),
     });
     console.log('Firebase Admin SDK inicializado correctamente.');
   } catch (error: any) {
+    // Un error aquí es crítico, lo registramos para depuración en el servidor.
     console.error('Error catastrófico al inicializar Firebase Admin SDK:', error.message);
   }
 }
