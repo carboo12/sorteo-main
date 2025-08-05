@@ -1,40 +1,37 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper function to check for superuser role
+    
     function isSuperuser() {
-      // Check if the user is authenticated and their email matches the superuser email.
-      return request.auth != null && request.auth.token.email == 'carboo12@gmail.com';
+      return request.auth.token.email == 'carboo12@gmail.com';
     }
 
-    // Rules for the 'businesses' collection
+    // Superuser can fully manage businesses
     match /businesses/{businessId} {
-      // Superuser can create, read, update, and delete any business document.
-      allow read, update, delete: if isSuperuser();
-      // Superuser can list all businesses.
-      allow list: if isSuperuser();
-       // Superuser can create new businesses.
-      allow create: if isSuperuser();
-      
-      // Rules for raffles subcollection within a business
-      match /raffles/{raffleId} {
-        // Authenticated users assigned to this business can read its raffles.
-        allow read: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == businessId;
-        // Allow writes only through specific server-side actions (implicitly handled by server logic)
-        allow write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == businessId;
-      }
+      allow read, write: if isSuperuser();
+    }
+    
+    match /businesses/{path=**} {
+       allow read, write: if isSuperuser();
     }
 
-    // Rules for the 'users' collection
+    // Users collection rules
     match /users/{userId} {
-      // Allow a user to read their own document.
-      allow read: if request.auth != null && request.auth.uid == userId;
-      // Allow superuser to read any user document.
-      allow read: if isSuperuser();
-      // Allow superuser to write to any user document.
-      allow write: if isSuperuser();
+      allow read, update: if request.auth.uid == userId || isSuperuser();
+      allow create: if isSuperuser(); // Only superuser can create new users initially
+      allow list: if isSuperuser(); // Only superuser can list users
+    }
+
+    // Business-specific data rules
+    match /businesses/{businessId}/raffles/{raffleId} {
+      function isBusinessMember() {
+        return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+               get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == businessId;
+      }
+      
+      allow read, write: if isBusinessMember();
     }
   }
 }

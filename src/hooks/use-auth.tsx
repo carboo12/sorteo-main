@@ -3,7 +3,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, setDoc, collection } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { getAuth, getFirestore } from '@/lib/firebase-client';
 
 const SUPERUSER_EMAIL = 'carboo12@gmail.com';
@@ -38,17 +38,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const userDocSnap = await getDoc(userDocRef);
         
         const isSuperuser = firebaseUser.email === SUPERUSER_EMAIL;
+        const determinedRole = isSuperuser ? 'superuser' : 'unknown';
 
         if (userDocSnap.exists()) {
           const userData = userDocSnap.data();
-          const determinedRole = isSuperuser ? 'superuser' : (userData.role || 'unknown');
+          const finalRole = isSuperuser ? 'superuser' : (userData.role || 'unknown');
           
-          if (userData.role !== determinedRole) {
-             await setDoc(userDocRef, { role: determinedRole }, { merge: true });
+          if (userData.role !== finalRole) {
+             await setDoc(userDocRef, { role: finalRole }, { merge: true });
              setUser({
                 uid: firebaseUser.uid,
                 email: firebaseUser.email,
-                role: determinedRole,
+                role: finalRole,
                 businessId: userData.businessId,
               });
           } else {
@@ -60,20 +61,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             });
           }
         } else {
-          const newUserData: Partial<AppUser> & { createdAt: Date } = {
+           const newUserData: AppUser = {
             uid: firebaseUser.uid,
             email: firebaseUser.email,
-            createdAt: new Date(),
+            role: determinedRole,
           };
-
-          if (isSuperuser) {
-            newUserData.role = 'superuser';
-          } else {
-            newUserData.role = 'unknown';
-          }
-          
-          await setDoc(userDocRef, newUserData);
-          setUser(newUserData as AppUser);
+          await setDoc(userDocRef, {
+            ...newUserData,
+             createdAt: new Date(),
+          });
+          setUser(newUserData);
         }
       } else {
         setUser(null);
