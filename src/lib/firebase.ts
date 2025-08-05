@@ -16,18 +16,21 @@ const firebaseConfig = {
 let app;
 
 // Verifica si la configuración está completa antes de inicializar.
-if (firebaseConfig.apiKey) {
+// Esto es crucial para prevenir errores si el .env.local no está configurado.
+if (firebaseConfig.apiKey && firebaseConfig.projectId) {
     if (!getApps().length) {
         app = initializeApp(firebaseConfig);
     } else {
         app = getApp();
     }
 } else {
-    console.error("Error de configuración de Firebase: Las variables de entorno no están cargadas. Asegúrate de que tu archivo .env.local esté configurado.");
+    console.error("Error de configuración de Firebase: Las variables de entorno NEXT_PUBLIC_* no están cargadas. Asegúrate de que tu archivo .env.local esté configurado correctamente.");
+    // Creamos un objeto 'proxy' para que la app no crashee en el servidor durante la build,
+    // pero lanzará un error claro si se intenta usar en el cliente sin configuración.
     app = new Proxy({}, {
         get: (target, prop) => {
             if (prop === '_isInitialized') return false;
-            throw new Error("Firebase no está inicializado. Revisa la configuración de tus variables de entorno.");
+            throw new Error("Firebase no está inicializado. Revisa la configuración de tus variables de entorno NEXT_PUBLIC_*.");
         }
     }) as any;
 }

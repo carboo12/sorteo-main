@@ -8,23 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, ArrowRight, Eye, EyeOff } from 'lucide-react';
-import { getApp, getApps, initializeApp } from 'firebase/app';
-import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
-
-// Configuración de Firebase directamente en el cliente
-// TODO: Reemplaza estos valores con las credenciales de tu proyecto de Firebase
-const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_AUTH_DOMAIN",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_STORAGE_BUCKET",
-    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-    appId: "YOUR_APP_ID",
-};
-
-// Inicializar Firebase
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const auth = getAuth(app);
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '@/lib/firebase'; // Import auth from the centralized config file
 
 
 export default function LoginPage() {
@@ -39,16 +24,6 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
 
-    if (firebaseConfig.apiKey === "YOUR_API_KEY") {
-        toast({
-            variant: 'destructive',
-            title: 'Error de Configuración',
-            description: 'Las credenciales de Firebase no están configuradas. Revisa el objeto firebaseConfig en src/app/login/page.tsx.',
-        });
-        setIsLoading(false);
-        return;
-    }
-
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const token = await userCredential.user.getIdToken();
@@ -60,11 +35,14 @@ export default function LoginPage() {
     } catch (error: any) {
       let errorMessage = 'No se pudo iniciar sesión. Por favor, revisa tus credenciales.';
        if (error.code) {
-         errorMessage = `Error: ${error.code}. Revisa tus credenciales o la configuración del proyecto.`;
+         if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
+             errorMessage = 'Correo electrónico o contraseña incorrectos.';
+         } else if (error.code === 'auth/invalid-api-key' || error.code === 'auth/project-not-found') {
+             errorMessage = `Error de configuración de Firebase: ${error.code}. Revisa las variables NEXT_PUBLIC en tu archivo .env.local`;
+         } else {
+             errorMessage = `Error: ${error.code}. Revisa tus credenciales o la configuración del proyecto.`;
+         }
        }
-      if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
-          errorMessage = 'Correo electrónico o contraseña incorrectos.';
-      }
       toast({
         variant: 'destructive',
         title: 'Error de autenticación',
