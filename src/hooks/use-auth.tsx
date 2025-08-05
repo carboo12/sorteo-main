@@ -3,7 +3,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, setDoc, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection } from 'firebase/firestore';
 import { getAuth, getFirestore } from '@/lib/firebase-client';
 
 const SUPERUSER_EMAIL = 'carboo12@gmail.com';
@@ -46,39 +46,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             businessId: userData.businessId,
           });
         } else {
-          // If the user doc doesn't exist, create it.
           const isSuperuser = firebaseUser.email === SUPERUSER_EMAIL;
           
           if (isSuperuser) {
-            const batch = writeBatch(db);
-            
-            // Create a default business for the superuser
-            const businessRef = doc(collection(db, 'businesses'));
-            batch.set(businessRef, {
-              name: 'Mi Negocio Principal',
-              owner: firebaseUser.uid,
-              createdAt: new Date(),
-            });
-
-            // Create the superuser's user document
-            const newUserData = {
-                uid: firebaseUser.uid,
-                email: firebaseUser.email,
-                role: 'superuser',
-                createdAt: new Date(),
-                businessId: businessRef.id,
-            };
-            batch.set(userDocRef, newUserData);
-
-            await batch.commit();
-            setUser(newUserData);
-
-          } else {
-             // For normal users, mark them as unknown until assigned to a business.
              const newUserData = {
                 uid: firebaseUser.uid,
                 email: firebaseUser.email,
-                role: 'unknown',
+                role: 'superuser' as const,
+                createdAt: new Date(),
+             };
+             await setDoc(userDocRef, newUserData);
+             setUser(newUserData);
+          } else {
+             const newUserData = {
+                uid: firebaseUser.uid,
+                email: firebaseUser.email,
+                role: 'unknown' as const,
                 createdAt: new Date(),
              };
              await setDoc(userDocRef, newUserData);
@@ -87,7 +70,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } else {
         setUser(null);
-        document.cookie = 'firebaseIdToken=; path=/; max-age=-1'; // Clear cookie
+        document.cookie = 'firebaseIdToken=; path=/; max-age=-1';
       }
       setLoading(false);
     });

@@ -7,8 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { getTurnoData } from '@/lib/actions';
 import { getCurrentTurno } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
-import { Loader2, Ticket, Trophy, Sunrise, Sunset, Moon } from 'lucide-react';
+import { Loader2, Ticket, Trophy, Sunrise, Sunset, Moon, Building } from 'lucide-react';
 import type { TurnoData } from '@/lib/types';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
 
 interface DailyStats {
   turno1: TurnoData & { winner: number | null };
@@ -23,7 +25,10 @@ export default function DashboardHomePage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (authLoading) return;
+    if (authLoading || user?.role === 'superuser') {
+      setLoading(false);
+      return;
+    }
 
     const fetchStats = async () => {
       if (!user?.businessId) {
@@ -59,6 +64,33 @@ export default function DashboardHomePage() {
 
     fetchStats();
   }, [authLoading, user]);
+  
+  const renderSuperuserDashboard = () => (
+    <DashboardLayout>
+      <div className="flex-1 space-y-4 p-8 pt-6">
+        <h2 className="text-3xl font-bold tracking-tight">Bienvenido, Superusuario</h2>
+        <Card>
+          <CardHeader>
+            <CardTitle>Gestión de Negocios</CardTitle>
+            <CardDescription>
+              Desde aquí puedes crear, ver y administrar todos los negocios que utilizan la plataforma.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p>
+              Usa el menú de la izquierda para navegar a la sección de "Negocios" y comenzar.
+            </p>
+             <Link href="/dashboard/businesses" passHref>
+                <Button className='mt-4'>
+                    <Building className="mr-2 h-4 w-4" />
+                    Ir a Negocios
+                </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+    </DashboardLayout>
+  );
 
   if (authLoading || (loading && user?.businessId)) {
     return (
@@ -68,6 +100,10 @@ export default function DashboardHomePage() {
         </div>
       </DashboardLayout>
     );
+  }
+  
+  if (user?.role === 'superuser') {
+    return renderSuperuserDashboard();
   }
   
   if (!user?.businessId) {
