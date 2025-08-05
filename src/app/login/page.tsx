@@ -7,18 +7,19 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, LogIn, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { Loader2, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { getApp, getApps, initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 
 // Configuración de Firebase directamente en el cliente
+// TODO: Reemplaza estos valores con las credenciales de tu proyecto de Firebase
 const firebaseConfig = {
-    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_AUTH_DOMAIN",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_STORAGE_BUCKET",
+    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+    appId: "YOUR_APP_ID",
 };
 
 // Inicializar Firebase
@@ -38,11 +39,11 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
 
-    if (!firebaseConfig.apiKey) {
+    if (firebaseConfig.apiKey === "YOUR_API_KEY") {
         toast({
             variant: 'destructive',
             title: 'Error de Configuración',
-            description: 'Las credenciales de Firebase no están configuradas. Revisa tu archivo .env.local.',
+            description: 'Las credenciales de Firebase no están configuradas. Revisa el objeto firebaseConfig en src/app/login/page.tsx.',
         });
         setIsLoading(false);
         return;
