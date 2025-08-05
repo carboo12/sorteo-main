@@ -6,21 +6,19 @@ export function middleware(request: NextRequest) {
   const token = request.cookies.get('firebaseIdToken');
   const { pathname } = request.nextUrl;
 
-  // Allow access to login page regardless of auth status
-  if (pathname.startsWith('/login')) {
-    return NextResponse.next();
-  }
+  const isAuthPage = pathname.startsWith('/login');
 
-  // If no token and not on login page, redirect to login
-  if (!token) {
+  // If there's no token and the user is not trying to log in, redirect to login page.
+  if (!token && !isAuthPage) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  // If there's a token but user tries to access login, redirect to dashboard
-  if (token && pathname.startsWith('/login')) {
-      return NextResponse.redirect(new URL('/dashboard', request.url));
+  // If there is a token and the user is on the login page, redirect to the dashboard.
+  if (token && isAuthPage) {
+    return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
+  // Otherwise, allow the request to proceed.
   return NextResponse.next();
 }
 

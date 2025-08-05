@@ -38,37 +38,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const userDocSnap = await getDoc(userDocRef);
         
         const isSuperuser = firebaseUser.email === SUPERUSER_EMAIL;
+        let role = isSuperuser ? 'superuser' : 'unknown';
+        let businessId: string | undefined = undefined;
         
         if (userDocSnap.exists()) {
           const userData = userDocSnap.data();
-          const role = isSuperuser ? 'superuser' : (userData.role || 'unknown');
-          
+          // The role from the document is only used if the user is not a superuser.
+          if (!isSuperuser) {
+            role = userData.role || 'unknown';
+          }
+          businessId = userData.businessId;
+
+          // If the role in the DB is different from the calculated one (e.g., a superuser was previously 'admin'), update it.
           if (userData.role !== role) {
              await setDoc(userDocRef, { role: role }, { merge: true });
           }
-
-          setUser({
-              uid: firebaseUser.uid,
-              email: firebaseUser.email,
-              role: role,
-              businessId: userData.businessId,
-          });
-
         } else {
-           const role = isSuperuser ? 'superuser' : 'unknown';
-           const newUserData: Omit<AppUser, 'businessId'> & { createdAt: Date } = {
-            uid: firebaseUser.uid,
-            email: firebaseUser.email,
-            role: role,
-            createdAt: new Date(),
-          };
-          await setDoc(userDocRef, newUserData);
-          setUser({
-            uid: newUserData.uid,
-            email: newUserData.email,
-            role: newUserData.role
-          });
+           // If the document doesn't exist, create it with the determined role.
+           await setDoc(userDocRef, {
+             uid: firebaseUser.uid,
+             email: firebaseUser.email,
+             role: role,
+             createdAt: new Date(),
+           });
         }
+
+        setUser({
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          role: role,
+          businessId: businessId,
+        });
+
       } else {
         setUser(null);
         document.cookie = 'firebaseIdToken=; path=/; max-age=-1';
