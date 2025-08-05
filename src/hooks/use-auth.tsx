@@ -38,39 +38,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const userDocSnap = await getDoc(userDocRef);
         
         const isSuperuser = firebaseUser.email === SUPERUSER_EMAIL;
-        const determinedRole = isSuperuser ? 'superuser' : 'unknown';
-
+        
         if (userDocSnap.exists()) {
           const userData = userDocSnap.data();
-          const finalRole = isSuperuser ? 'superuser' : (userData.role || 'unknown');
+          const role = isSuperuser ? 'superuser' : (userData.role || 'unknown');
           
-          if (userData.role !== finalRole) {
-             await setDoc(userDocRef, { role: finalRole }, { merge: true });
-             setUser({
-                uid: firebaseUser.uid,
-                email: firebaseUser.email,
-                role: finalRole,
-                businessId: userData.businessId,
-              });
-          } else {
-            setUser({
-                uid: firebaseUser.uid,
-                email: firebaseUser.email,
-                role: userData.role || 'unknown',
-                businessId: userData.businessId,
-            });
+          if (userData.role !== role) {
+             await setDoc(userDocRef, { role: role }, { merge: true });
           }
+
+          setUser({
+              uid: firebaseUser.uid,
+              email: firebaseUser.email,
+              role: role,
+              businessId: userData.businessId,
+          });
+
         } else {
-           const newUserData: AppUser = {
+           const role = isSuperuser ? 'superuser' : 'unknown';
+           const newUserData: Omit<AppUser, 'businessId'> & { createdAt: Date } = {
             uid: firebaseUser.uid,
             email: firebaseUser.email,
-            role: determinedRole,
+            role: role,
+            createdAt: new Date(),
           };
-          await setDoc(userDocRef, {
-            ...newUserData,
-             createdAt: new Date(),
+          await setDoc(userDocRef, newUserData);
+          setUser({
+            uid: newUserData.uid,
+            email: newUserData.email,
+            role: newUserData.role
           });
-          setUser(newUserData);
         }
       } else {
         setUser(null);

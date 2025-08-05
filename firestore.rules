@@ -1,37 +1,36 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
+
+    // Helper function to check for superuser
     function isSuperuser() {
       return request.auth.token.email == 'carboo12@gmail.com';
     }
 
-    // Superuser can fully manage businesses
+    // Superusers can manage all businesses
     match /businesses/{businessId} {
       allow read, write: if isSuperuser();
     }
-    
-    match /businesses/{path=**} {
-       allow read, write: if isSuperuser();
-    }
 
-    // Users collection rules
+    // Users can read/update their own user document. Only superusers can create/delete users.
     match /users/{userId} {
-      allow read, update: if request.auth.uid == userId || isSuperuser();
-      allow create: if isSuperuser(); // Only superuser can create new users initially
-      allow list: if isSuperuser(); // Only superuser can list users
+      allow read, update: if request.auth.uid == userId;
+      allow create, delete: if isSuperuser();
     }
 
-    // Business-specific data rules
+    // Raffle data can be accessed by users belonging to that business. Superusers can access all.
     match /businesses/{businessId}/raffles/{raffleId} {
-      function isBusinessMember() {
-        return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-               get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == businessId;
-      }
-      
-      allow read, write: if isBusinessMember();
+       allow read, write: if isSuperuser() || 
+                         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+                          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == businessId);
     }
+
+    // Winning history is managed internally by draws. Access rules mirror raffles.
+     match /businesses/{businessId}/winningHistory/{monthId} {
+        allow read, write: if isSuperuser() || 
+                         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+                          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == businessId);
+     }
   }
 }
