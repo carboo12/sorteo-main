@@ -12,10 +12,12 @@ import {
   getDocs,
   Timestamp,
   serverTimestamp,
+  addDoc,
+  query,
 } from 'firebase/firestore';
 import { getFirestore } from './firebase';
 import { selectWinningNumber } from '@/ai/flows/select-winning-number';
-import type { TurnoData, Winner, Ticket, TurnoInfo } from './types';
+import type { TurnoData, Winner, Ticket, TurnoInfo, Business, Location } from './types';
 
 function safeParseTurnoData(data: any): TurnoData {
   const tickets = (data?.tickets || []).map((ticket: any) => ({
@@ -222,4 +224,47 @@ export async function getWinnerHistory(businessId: string): Promise<Winner[]> {
     console.error('Error getting winner history:', error);
     return [];
   }
+}
+
+export async function createBusiness(
+    data: Omit<Business, 'id' | 'createdAt'>
+): Promise<{ success: boolean; message: string; businessId?: string }> {
+    try {
+        const db = await getFirestore();
+        const businessData = {
+            ...data,
+            licenseExpiresAt: Timestamp.fromDate(new Date(data.licenseExpiresAt)),
+            createdAt: serverTimestamp()
+        };
+        const docRef = await addDoc(collection(db, "businesses"), businessData);
+        return { success: true, message: "Negocio creado con éxito", businessId: docRef.id };
+    } catch (error: any) {
+        console.error("Error creating business:", error);
+        return { success: false, message: error.message || "No se pudo crear el negocio." };
+    }
+}
+
+export async function getBusinesses(): Promise<Business[]> {
+    try {
+        const db = await getFirestore();
+        const businessesRef = collection(db, 'businesses');
+        const q = query(businessesRef);
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                name: data.name,
+                phone: data.phone,
+                ownerEmail: data.ownerEmail,
+                licenseExpiresAt: (data.licenseExpiresAt as Timestamp).toDate().toISOString(),
+                address: data.address,
+                location: data.location,
+                createdAt: data.createdAt,
+            }
+        });
+    } catch (error) {
+        console.error("Error fetching businesses:", error);
+        return [];
+    }
 }

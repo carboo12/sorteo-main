@@ -24,3 +24,19 @@ export interface TurnoInfo {
   turno: string;
   key: string;
 }
+
+export interface Location {
+    lat: number;
+    lng: number;
+}
+
+export interface Business {
+    id: string;
+    name: string;
+    phone: string;
+    ownerEmail: string;
+    licenseExpiresAt: string; // ISO string
+    address: string;
+    location?: Location;
+    createdAt: any; // Firestore Timestamp
+}
