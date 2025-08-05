@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, LogIn, Eye, EyeOff } from 'lucide-react';
+import { Loader2, LogIn, Eye, EyeOff, ArrowRight } from 'lucide-react';
 import { getApp, getApps, initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 
@@ -58,6 +58,9 @@ export default function LoginPage() {
 
     } catch (error: any) {
       let errorMessage = 'No se pudo iniciar sesión. Por favor, revisa tus credenciales.';
+       if (error.code) {
+         errorMessage = `Error: ${error.code}. Revisa tus credenciales o la configuración del proyecto.`;
+       }
       if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
           errorMessage = 'Correo electrónico o contraseña incorrectos.';
       }
@@ -120,7 +123,7 @@ export default function LoginPage() {
             </CardContent>
             <CardFooter>
               <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? <Loader2 className="animate-spin" /> : <LogIn className="mr-2" />}
+                {isLoading ? <Loader2 className="animate-spin" /> : <ArrowRight className="mr-2" />}
                 Iniciar Sesión
               </Button>
             </CardFooter>
