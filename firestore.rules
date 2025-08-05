@@ -1,20 +1,9 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-  
-    // Default deny all
     match /{document=**} {
-      allow read, write: if false;
-    }
-
-    // Users can read/write their own user document
-    match /users/{userId} {
-      allow read, update: if request.auth != null && request.auth.uid == userId;
-    }
-
-    // Allow authenticated users to read and write to their own business's raffle data
-    match /businesses/{businessId}/{document=**} {
-      allow read, write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == businessId;
+      allow read, write: if true;
     }
   }
 }
