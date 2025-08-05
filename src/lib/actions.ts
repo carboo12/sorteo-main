@@ -1,4 +1,3 @@
-
 'use server';
 
 import {
@@ -15,7 +14,7 @@ import {
   addDoc,
   query,
 } from 'firebase/firestore';
-import { firestore } from './firebase'; // Use client-initialized instance on server
+import { firestore as clientFirestore } from './firebase'; // Renamed to avoid confusion
 import { firestore as adminFirestore } from './firebase-admin'; // Admin SDK for privileged actions
 import { selectWinningNumber } from '@/ai/flows/select-winning-number';
 import type { TurnoData, Winner, Ticket, TurnoInfo, Business, Location } from './types';
@@ -43,7 +42,7 @@ export async function getTurnoData(
     return { tickets: [] };
   }
   try {
-    const docRef = doc(firestore, 'businesses', businessId, 'raffles', date);
+    const docRef = doc(clientFirestore, 'businesses', businessId, 'raffles', date);
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
@@ -69,9 +68,9 @@ export async function buyTicket(
     return { success: false, message: "Business ID no encontrado." };
   }
   try {
-    const raffleDocRef = doc(firestore, 'businesses', businessId, 'raffles', date);
+    const raffleDocRef = doc(clientFirestore, 'businesses', businessId, 'raffles', date);
 
-    await runTransaction(firestore, async (transaction) => {
+    await runTransaction(clientFirestore, async (transaction) => {
       const raffleDoc = await transaction.get(raffleDocRef);
       
       let dayData = raffleDoc.exists() ? raffleDoc.data() : {};
@@ -116,13 +115,13 @@ export async function drawWinner(
    if (!businessId) {
     return { success: false, message: "Business ID no encontrado." };
   }
-   const raffleDocRef = doc(firestore, 'businesses', businessId, 'raffles', date);
+   const raffleDocRef = doc(clientFirestore, 'businesses', businessId, 'raffles', date);
    const monthId = date.substring(0, 7); // YYYY-MM
-   const winningHistoryRef = doc(firestore, 'businesses', businessId, 'winningHistory', monthId);
+   const winningHistoryRef = doc(clientFirestore, 'businesses', businessId, 'winningHistory', monthId);
 
    try {
      let winningNumber: number;
-     await runTransaction(firestore, async (transaction) => {
+     await runTransaction(clientFirestore, async (transaction) => {
         const [raffleDoc, historyDoc] = await Promise.all([
             transaction.get(raffleDocRef),
             transaction.get(winningHistoryRef)
@@ -185,7 +184,7 @@ export async function drawWinner(
 export async function getWinnerHistory(businessId: string): Promise<Winner[]> {
   if (!businessId) return [];
   try {
-    const rafflesCollectionRef = collection(firestore, 'businesses', businessId, 'raffles');
+    const rafflesCollectionRef = collection(clientFirestore, 'businesses', businessId, 'raffles');
     const querySnapshot = await getDocs(rafflesCollectionRef);
     const winners: any[] = [];
 
@@ -232,7 +231,7 @@ export async function createBusiness(
             licenseExpiresAt: Timestamp.fromDate(new Date(data.licenseExpiresAt)),
             createdAt: Timestamp.now()
         };
-        const docRef = await adminFirestore.collection("businesses").add(businessData);
+        const docRef = await adminFirestore().collection("businesses").add(businessData);
         return { success: true, message: "Negocio creado con éxito", businessId: docRef.id };
     } catch (error: any) {
         console.error("Error creating business:", error);
@@ -242,7 +241,7 @@ export async function createBusiness(
 
 export async function getBusinesses(): Promise<Business[]> {
     try {
-        const businessesRef = adminFirestore.collection('businesses');
+        const businessesRef = adminFirestore().collection('businesses');
         const querySnapshot = await businessesRef.get();
         return querySnapshot.docs.map(doc => {
             const data = doc.data();
