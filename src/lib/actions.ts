@@ -1,8 +1,7 @@
+
 'use server';
 
-import { getApp, getApps, initializeApp } from 'firebase/app';
 import {
-  getFirestore,
   doc,
   getDoc,
   setDoc,
@@ -14,24 +13,9 @@ import {
   Timestamp,
   serverTimestamp,
 } from 'firebase/firestore';
+import { getFirestore } from './firebase';
 import { selectWinningNumber } from '@/ai/flows/select-winning-number';
 import type { TurnoData, Winner, Ticket, TurnoInfo } from './types';
-
-// Your web app's Firebase configuration
-// IMPORTANT: Replace with your own Firebase project configuration
-// and store them securely in environment variables.
-const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-};
-
-// Initialize Firebase
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const db = getFirestore(app);
 
 function safeParseTurnoData(data: any): TurnoData {
   const tickets = (data?.tickets || []).map((ticket: any) => ({
@@ -48,10 +32,16 @@ function safeParseTurnoData(data: any): TurnoData {
 
 
 export async function getTurnoData(
-  { date, turno }: TurnoInfo
+  { date, turno }: TurnoInfo,
+  businessId: string
 ): Promise<TurnoData> {
+  if (!businessId) {
+    console.error("Business ID is required to fetch turno data");
+    return { tickets: [] };
+  }
   try {
-    const docRef = doc(db, 'raffles', date);
+    const db = await getFirestore();
+    const docRef = doc(db, 'businesses', businessId, 'raffles', date);
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
@@ -70,10 +60,15 @@ export async function getTurnoData(
 export async function buyTicket(
   { date, turno }: TurnoInfo,
   number: number,
-  name: string | null
+  name: string | null,
+  businessId: string
 ): Promise<{ success: boolean; message: string }> {
+   if (!businessId) {
+    return { success: false, message: "Business ID no encontrado." };
+  }
   try {
-    const raffleDocRef = doc(db, 'raffles', date);
+    const db = await getFirestore();
+    const raffleDocRef = doc(db, 'businesses', businessId, 'raffles', date);
 
     await runTransaction(db, async (transaction) => {
       const raffleDoc = await transaction.get(raffleDocRef);
@@ -114,11 +109,16 @@ export async function buyTicket(
 }
 
 export async function drawWinner(
-  { date, turno }: TurnoInfo
+  { date, turno }: TurnoInfo,
+  businessId: string
 ): Promise<{ success: boolean; message: string; winningNumber?: number }> {
-   const raffleDocRef = doc(db, 'raffles', date);
+   if (!businessId) {
+    return { success: false, message: "Business ID no encontrado." };
+  }
+   const db = await getFirestore();
+   const raffleDocRef = doc(db, 'businesses', businessId, 'raffles', date);
    const monthId = date.substring(0, 7); // YYYY-MM
-   const winningHistoryRef = doc(db, 'winningHistory', monthId);
+   const winningHistoryRef = doc(db, 'businesses', businessId, 'winningHistory', monthId);
 
    try {
      let winningNumber: number;
@@ -182,10 +182,13 @@ export async function drawWinner(
    }
 }
 
-export async function getWinnerHistory(): Promise<Winner[]> {
+export async function getWinnerHistory(businessId: string): Promise<Winner[]> {
+  if (!businessId) return [];
   try {
-    const querySnapshot = await getDocs(collection(db, 'raffles'));
-    const winners: any[] = []; // Using any to hold Date object temporarily
+    const db = await getFirestore();
+    const rafflesCollectionRef = collection(db, 'businesses', businessId, 'raffles');
+    const querySnapshot = await getDocs(rafflesCollectionRef);
+    const winners: any[] = [];
 
     querySnapshot.forEach((dayDoc) => {
       const date = dayDoc.id;
@@ -203,10 +206,8 @@ export async function getWinnerHistory(): Promise<Winner[]> {
       }
     });
 
-    // Sort by the actual Date object
     winners.sort((a, b) => b.drawnAt.getTime() - a.drawnAt.getTime());
 
-    // Now map to the final Winner[] structure with a formatted, reliable string
     return winners.map((winner) => ({
       ...winner,
       drawnAt: winner.drawnAt.toLocaleString('es-ES', {

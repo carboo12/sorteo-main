@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -22,12 +23,14 @@ import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { useAuth } from '@/hooks/use-auth';
 
 const buyTicketSchema = z.object({
   name: z.string().optional(),
 });
 
 export default function RaffleClient() {
+  const { user, loading: authLoading } = useAuth();
   const [turnoInfo, setTurnoInfo] = useState<TurnoInfo | null>(null);
   const [turnoData, setTurnoData] = useState<TurnoData>({ tickets: [] });
   const [winnerHistory, setWinnerHistory] = useState<Winner[]>([]);
@@ -43,14 +46,18 @@ export default function RaffleClient() {
     defaultValues: { name: '' },
   });
 
+  const businessId = user?.businessId;
+  const userRole = user?.role;
+
   const loadData = async () => {
+    if (!businessId) return;
     setIsLoading(true);
     try {
       const currentTurno = getCurrentTurno();
       setTurnoInfo(currentTurno);
       const [data, history] = await Promise.all([
-        getTurnoData(currentTurno),
-        getWinnerHistory(),
+        getTurnoData(currentTurno, businessId),
+        getWinnerHistory(businessId),
       ]);
       setTurnoData(data);
       setWinnerHistory(history);
@@ -66,15 +73,22 @@ export default function RaffleClient() {
   };
 
   useEffect(() => {
-    loadData();
+    if (!authLoading && businessId) {
+      loadData();
+    }
+  }, [authLoading, businessId]);
+
+  useEffect(() => {
     const interval = setInterval(() => {
         const newTurno = getCurrentTurno();
         if (newTurno.key !== turnoInfo?.key) {
-            loadData();
+            if (!authLoading && businessId) {
+                loadData();
+            }
         }
-    }, 60 * 1000); // Check every minute for turno change
+    }, 60 * 1000); 
     return () => clearInterval(interval);
-  }, [turnoInfo?.key]);
+  }, [turnoInfo?.key, authLoading, businessId]);
 
   const soldNumbers = useMemo(() => new Set(turnoData.tickets.map((t) => t.number)), [turnoData]);
 
@@ -86,9 +100,9 @@ export default function RaffleClient() {
   };
 
   const handleBuyTicket = async (values: z.infer<typeof buyTicketSchema>) => {
-    if (!selectedNumber || !turnoInfo) return;
+    if (!selectedNumber || !turnoInfo || !businessId) return;
     setIsBuying(true);
-    const result = await buyTicket(turnoInfo, selectedNumber, values.name || null);
+    const result = await buyTicket(turnoInfo, selectedNumber, values.name || null, businessId);
     if (result.success) {
       toast({ title: '¡Éxito!', description: result.message });
       setTurnoData((prev) => ({
@@ -103,20 +117,40 @@ export default function RaffleClient() {
   };
 
   const handleDrawWinner = async () => {
-    if (!turnoInfo) return;
+    if (!turnoInfo || !businessId) return;
     setIsDrawing(true);
-    const result = await drawWinner(turnoInfo);
+    const result = await drawWinner(turnoInfo, businessId);
     if (result.success && result.winningNumber) {
       toast({
         title: '¡Tenemos un ganador!',
         description: result.message,
       });
-      loadData(); // Reload all data to get winner info
+      loadData(); 
     } else {
       toast({ variant: 'destructive', title: 'Sorteo Fallido', description: result.message });
     }
     setIsDrawing(false);
   };
+  
+  const canDraw = userRole === 'admin' || userRole === 'superuser';
+
+
+  if (authLoading || (isLoading && businessId)) {
+    return (
+        <div className="flex justify-center items-center h-96">
+            <Loader2 className="h-16 w-16 animate-spin text-primary" />
+        </div>
+    );
+  }
+
+  if (!businessId && !authLoading) {
+    return (
+        <div className="flex justify-center items-center h-96">
+            <p className="text-destructive text-lg">No estás asociado a ningún negocio. Contacta al superusuario.</p>
+        </div>
+    );
+  }
+
 
   return (
     <div className="container mx-auto p-4 md:p-8 font-body">
@@ -143,11 +177,6 @@ export default function RaffleClient() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
-                <div className="flex justify-center items-center h-96">
-                  <Loader2 className="h-16 w-16 animate-spin text-primary" />
-                </div>
-              ) : (
                 <div className="grid grid-cols-10 gap-2">
                   {Array.from({ length: 100 }, (_, i) => i + 1).map((number) => {
                     const isSold = soldNumbers.has(number);
@@ -170,20 +199,21 @@ export default function RaffleClient() {
                     );
                   })}
                 </div>
-              )}
             </CardContent>
           </Card>
-          <div className="mt-6 flex justify-center">
-            <Button
-                size="lg"
-                className="font-bold text-xl px-12 py-8 shadow-lg transform hover:scale-105"
-                onClick={handleDrawWinner}
-                disabled={isDrawing || !!turnoData.winningNumber || turnoData.tickets.length === 0}
-            >
-                {isDrawing ? <Loader2 className="mr-2 h-6 w-6 animate-spin" /> : <Trophy className="mr-2 h-6 w-6" />}
-                {!!turnoData.winningNumber ? 'Ganador Seleccionado' : '¡Realizar Sorteo!'}
-            </Button>
-          </div>
+          {canDraw && (
+            <div className="mt-6 flex justify-center">
+                <Button
+                    size="lg"
+                    className="font-bold text-xl px-12 py-8 shadow-lg transform hover:scale-105"
+                    onClick={handleDrawWinner}
+                    disabled={isDrawing || !!turnoData.winningNumber || turnoData.tickets.length === 0}
+                >
+                    {isDrawing ? <Loader2 className="mr-2 h-6 w-6 animate-spin" /> : <Trophy className="mr-2 h-6 w-6" />}
+                    {!!turnoData.winningNumber ? 'Ganador Seleccionado' : '¡Realizar Sorteo!'}
+                </Button>
+            </div>
+          )}
         </div>
 
         <div className="lg:col-span-1 space-y-8">
