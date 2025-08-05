@@ -6,12 +6,12 @@ import {
   createUserWithEmailAndPassword,
   signOut,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, getDocs, collection } from 'firebase/firestore';
-import { getAuth, getFirestore } from './firebase';
+import { doc, setDoc } from 'firebase/firestore';
+import { auth, firestore } from './firebase';
+
 
 export async function signInWithEmail(email: string, password: string): Promise<{ success: boolean; error?: string; }> {
     try {
-        const auth = await getAuth();
         await signInWithEmailAndPassword(auth, email, password);
         return { success: true };
     } catch (error: any) {
@@ -21,7 +21,6 @@ export async function signInWithEmail(email: string, password: string): Promise<
 
 export async function signOutUser() {
     try {
-        const auth = await getAuth();
         await signOut(auth);
     } catch (error: any) {
         console.error("Error signing out: ", error);
@@ -30,13 +29,11 @@ export async function signOutUser() {
 
 export async function signUpWithEmail(email: string, password: string, role: 'admin' | 'seller', businessId: string): Promise<{ success: boolean; error?: string; }> {
     try {
-        const auth = await getAuth();
-        const db = await getFirestore();
         // We might need to handle this differently if we want superuser to create users without them signing up
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
 
-        await setDoc(doc(db, "users", user.uid), {
+        await setDoc(doc(firestore, "users", user.uid), {
             email: user.email,
             role: role,
             businessId: businessId,

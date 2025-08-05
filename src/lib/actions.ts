@@ -15,7 +15,7 @@ import {
   addDoc,
   query,
 } from 'firebase/firestore';
-import { getFirestore } from './firebase'; // For client-side rules if needed in future
+import { firestore } from './firebase'; // Use client-initialized instance on server
 import { firestore as adminFirestore } from './firebase-admin'; // Admin SDK for privileged actions
 import { selectWinningNumber } from '@/ai/flows/select-winning-number';
 import type { TurnoData, Winner, Ticket, TurnoInfo, Business, Location } from './types';
@@ -43,8 +43,7 @@ export async function getTurnoData(
     return { tickets: [] };
   }
   try {
-    const db = await getFirestore();
-    const docRef = doc(db, 'businesses', businessId, 'raffles', date);
+    const docRef = doc(firestore, 'businesses', businessId, 'raffles', date);
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
@@ -70,10 +69,9 @@ export async function buyTicket(
     return { success: false, message: "Business ID no encontrado." };
   }
   try {
-    const db = await getFirestore(); // Use client-side SDK for user-initiated actions respecting rules
-    const raffleDocRef = doc(db, 'businesses', businessId, 'raffles', date);
+    const raffleDocRef = doc(firestore, 'businesses', businessId, 'raffles', date);
 
-    await runTransaction(db, async (transaction) => {
+    await runTransaction(firestore, async (transaction) => {
       const raffleDoc = await transaction.get(raffleDocRef);
       
       let dayData = raffleDoc.exists() ? raffleDoc.data() : {};
@@ -118,14 +116,13 @@ export async function drawWinner(
    if (!businessId) {
     return { success: false, message: "Business ID no encontrado." };
   }
-   const db = await getFirestore();
-   const raffleDocRef = doc(db, 'businesses', businessId, 'raffles', date);
+   const raffleDocRef = doc(firestore, 'businesses', businessId, 'raffles', date);
    const monthId = date.substring(0, 7); // YYYY-MM
-   const winningHistoryRef = doc(db, 'businesses', businessId, 'winningHistory', monthId);
+   const winningHistoryRef = doc(firestore, 'businesses', businessId, 'winningHistory', monthId);
 
    try {
      let winningNumber: number;
-     await runTransaction(db, async (transaction) => {
+     await runTransaction(firestore, async (transaction) => {
         const [raffleDoc, historyDoc] = await Promise.all([
             transaction.get(raffleDocRef),
             transaction.get(winningHistoryRef)
@@ -188,8 +185,7 @@ export async function drawWinner(
 export async function getWinnerHistory(businessId: string): Promise<Winner[]> {
   if (!businessId) return [];
   try {
-    const db = await getFirestore();
-    const rafflesCollectionRef = collection(db, 'businesses', businessId, 'raffles');
+    const rafflesCollectionRef = collection(firestore, 'businesses', businessId, 'raffles');
     const querySnapshot = await getDocs(rafflesCollectionRef);
     const winners: any[] = [];
 

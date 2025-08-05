@@ -4,7 +4,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { getAuth, getFirestore } from '@/lib/firebase-client';
+import { auth, firestore } from '@/lib/firebase';
 
 const SUPERUSER_EMAIL = 'carboo12@gmail.com';
 
@@ -27,14 +27,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const auth = getAuth();
-    const db = getFirestore();
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
         const token = await firebaseUser.getIdToken();
         document.cookie = `firebaseIdToken=${token}; path=/; max-age=3600`;
 
-        const userDocRef = doc(db, 'users', firebaseUser.uid);
+        const userDocRef = doc(firestore, 'users', firebaseUser.uid);
         const userDocSnap = await getDoc(userDocRef);
         
         const isSuperuser = firebaseUser.email === SUPERUSER_EMAIL;
