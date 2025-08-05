@@ -1,7 +1,7 @@
 
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -20,29 +20,33 @@ import { Button } from '@/components/ui/button';
 import { Home, Ticket, Users, LogOut, Building } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { signOutUser } from '@/lib/auth-client';
+import { Loader2 } from 'lucide-react';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
+  useEffect(() => {
+    // This effect handles redirection logic.
+    // The middleware should prevent unauthenticated access, but this is a fallback.
+    if (!loading && !user) {
+      router.replace('/login');
+    }
+  }, [user, loading, router]);
+
+
   const handleSignOut = async () => {
     await signOutUser();
     router.push('/login');
   };
 
-  if (loading) {
+  if (loading || !user) {
       return (
-          <div className="flex h-screen items-center justify-center">
-              <div className="text-xl">Cargando...</div>
+          <div className="flex h-screen items-center justify-center bg-background">
+              <Loader2 className="h-16 w-16 animate-spin text-primary" />
           </div>
       )
-  }
-
-  if (!user) {
-    // This should ideally not be reached if middleware is set up, but as a fallback
-    router.replace('/login');
-    return null;
   }
   
   const menuItems = [
@@ -62,7 +66,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>
-            {menuItems.filter(item => item.roles.includes(user.role)).map(item => (
+            {menuItems.filter(item => user && item.roles.includes(user.role)).map(item => (
                  <SidebarMenuItem key={item.href}>
                     <Link href={item.href} passHref>
                         <SidebarMenuButton isActive={pathname === item.href} tooltip={item.label}>
