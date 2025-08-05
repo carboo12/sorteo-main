@@ -1,6 +1,5 @@
 
 'use server';
-
 import * as admin from 'firebase-admin';
 import serviceAccount from '../../service-account.json';
 
@@ -33,7 +32,7 @@ initializeAdminApp();
 // La función lanzará un error claro si la inicialización falló por alguna razón.
 function getSafeFirestore(): admin.firestore.Firestore {
     if (!admin.apps.length) {
-        throw new Error("Intento de usar Firestore, pero Firebase Admin SDK no se pudo inicializar. Revisa los logs de tu servidor para ver el error original.");
+        throw new Error("Attempted to use Firestore, but Firebase Admin SDK is not initialized. Revisa los logs de tu servidor para ver el error original.");
     }
     return admin.firestore();
 }
@@ -41,7 +40,7 @@ function getSafeFirestore(): admin.firestore.Firestore {
 // Exportamos una instancia segura de Auth.
 function getSafeAuth(): admin.auth.Auth {
     if (!admin.apps.length) {
-        throw new Error("Intento de usar Auth, pero Firebase Admin SDK no se pudo inicializar. Revisa los logs de tu servidor para ver el error original.");
+        throw new Error("Attempted to use Auth, but Firebase Admin SDK is not initialized. Revisa los logs de tu servidor para ver el error original.");
     }
     return admin.auth();
 }
