@@ -29,6 +29,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const db = getFirestore();
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
+        // Set cookie for middleware
+        const token = await firebaseUser.getIdToken();
+        document.cookie = `firebaseIdToken=${token}; path=/; max-age=3600`;
+
         // Fetch user role from Firestore
         const userDocRef = doc(db, 'users', firebaseUser.uid);
         const userDocSnap = await getDoc(userDocRef);
@@ -55,6 +59,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } else {
         setUser(null);
+        document.cookie = 'firebaseIdToken=; path=/; max-age=-1'; // Clear cookie
       }
       setLoading(false);
     });

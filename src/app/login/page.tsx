@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { signInWithEmail } from '@/lib/auth-client';
+import { signInWithEmailAndGetToken } from '@/lib/auth-client';
 import { Loader2, LogIn } from 'lucide-react';
 
 export default function LoginPage() {
@@ -22,9 +22,10 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const result = await signInWithEmail(email, password);
+      const result = await signInWithEmailAndGetToken(email, password);
       if (result.success) {
         toast({ title: '¡Éxito!', description: 'Has iniciado sesión correctamente.' });
+        document.cookie = `firebaseIdToken=${result.token}; path=/; max-age=3600`; // Set cookie
         router.push('/dashboard');
       } else {
         throw new Error(result.error || 'Error desconocido');
