@@ -38,7 +38,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const userDocSnap = await getDoc(userDocRef);
         
         const isSuperuser = firebaseUser.email === SUPERUSER_EMAIL;
-        let role = isSuperuser ? 'superuser' : 'unknown';
+        let role: AppUser['role'] = isSuperuser ? 'superuser' : 'unknown';
         let businessId: string | undefined = undefined;
         
         if (userDocSnap.exists()) {
