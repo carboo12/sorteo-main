@@ -15,12 +15,6 @@ const firebaseConfig = {
 
 function getAppInstance() {
     if (!getApps().length) {
-        if (!firebaseConfig.apiKey || firebaseConfig.apiKey === "tu_api_key") {
-            console.error("Firebase API Key is missing. Please check your .env file.");
-            // We return a dummy object here to avoid crashing the app immediately,
-            // allowing the developer to see the console error.
-            return new Proxy({}, { get: () => { throw new Error("Firebase not initialized due to missing API Key.")}});
-        }
         return initializeApp(firebaseConfig);
     }
     return getApp();
