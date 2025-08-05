@@ -3,8 +3,10 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { getAuth, getFirestore } from '@/lib/firebase-client';
+
+const SUPERUSER_EMAIL = 'carboo12@gmail.com';
 
 interface AppUser {
   uid: string;
@@ -29,13 +31,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const db = getFirestore();
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
-        // Set cookie for middleware
         const token = await firebaseUser.getIdToken();
         document.cookie = `firebaseIdToken=${token}; path=/; max-age=3600`;
 
-        // Fetch user role from Firestore
         const userDocRef = doc(db, 'users', firebaseUser.uid);
         const userDocSnap = await getDoc(userDocRef);
+        
         if (userDocSnap.exists()) {
           const userData = userDocSnap.data();
           setUser({
@@ -45,17 +46,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             businessId: userData.businessId,
           });
         } else {
-           // This could be a new user, check if they are the first.
-           const superUserDocRef = doc(db, 'config', 'superuser');
-           const superUserDoc = await getDoc(superUserDocRef);
-           if (!superUserDoc.exists()) {
-               // First user becomes superuser
-               // This part would be handled during sign-up, not sign-in state change.
-               // For now, we assume users exist.
-                setUser({ uid: firebaseUser.uid, email: firebaseUser.email, role: 'unknown' });
-           } else {
-                setUser({ uid: firebaseUser.uid, email: firebaseUser.email, role: 'unknown' });
-           }
+          // If the user doc doesn't exist, create it.
+          // This happens on the very first login for a new user.
+          const isSuperuser = firebaseUser.email === SUPERUSER_EMAIL;
+          const newUserRole = isSuperuser ? 'superuser' : 'unknown';
+          
+          const newUserData = {
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            role: newUserRole,
+            createdAt: new Date(),
+          };
+
+          // For superuser, we might not have a businessId initially.
+          // It can be created/assigned later.
+          if (!isSuperuser) {
+             // For normal users, a businessId should be assigned on creation,
+             // but here we mark them as unknown until assigned.
+          }
+
+          await setDoc(userDocRef, newUserData);
+          setUser({
+              ...newUserData
+          });
         }
       } else {
         setUser(null);

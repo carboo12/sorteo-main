@@ -2,7 +2,8 @@
 'use client';
 
 import React from 'react';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   Sidebar,
   SidebarContent,
@@ -23,6 +24,7 @@ import { signOutUser } from '@/lib/auth-client';
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   const handleSignOut = async () => {
     await signOutUser();
@@ -43,6 +45,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return null;
   }
   
+  const menuItems = [
+    { href: '/dashboard', label: 'Inicio', icon: <Home />, roles: ['superuser', 'admin', 'seller'] },
+    { href: '/dashboard/raffle', label: 'Sorteos', icon: <Ticket />, roles: ['superuser', 'admin', 'seller'] },
+    { href: '/dashboard/businesses', label: 'Negocios', icon: <Building />, roles: ['superuser'] },
+    { href: '/dashboard/users', label: 'Usuarios', icon: <Users />, roles: ['superuser', 'admin'] }
+  ];
+
   return (
     <SidebarProvider>
       <Sidebar>
@@ -53,26 +62,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton href="/dashboard" isActive={true} tooltip="Sorteos">
-                <Ticket />
-                Sorteos
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            {user.role === 'superuser' && (
-                 <SidebarMenuItem>
-                    <SidebarMenuButton href="/dashboard/businesses" tooltip="Negocios">
-                        <Building/>
-                        Negocios
-                    </SidebarMenuButton>
+            {menuItems.filter(item => item.roles.includes(user.role)).map(item => (
+                 <SidebarMenuItem key={item.href}>
+                    <Link href={item.href} passHref>
+                        <SidebarMenuButton isActive={pathname === item.href} tooltip={item.label}>
+                            {item.icon}
+                            {item.label}
+                        </SidebarMenuButton>
+                    </Link>
                  </SidebarMenuItem>
-            )}
-             <SidebarMenuItem>
-                <SidebarMenuButton href="/dashboard/users" tooltip="Usuarios">
-                    <Users />
-                    Usuarios
-                </SidebarMenuButton>
-             </SidebarMenuItem>
+            ))}
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter>
@@ -89,7 +88,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 {user.email} ({user.role})
             </div>
         </header>
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
+        <main className="flex-1 overflow-y-auto bg-slate-50">{children}</main>
       </SidebarInset>
     </SidebarProvider>
   );
