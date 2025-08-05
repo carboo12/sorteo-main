@@ -3,7 +3,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, writeBatch } from 'firebase/firestore';
 import { getAuth, getFirestore } from '@/lib/firebase-client';
 
 const SUPERUSER_EMAIL = 'carboo12@gmail.com';
@@ -47,28 +47,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           });
         } else {
           // If the user doc doesn't exist, create it.
-          // This happens on the very first login for a new user.
           const isSuperuser = firebaseUser.email === SUPERUSER_EMAIL;
-          const newUserRole = isSuperuser ? 'superuser' : 'unknown';
           
-          const newUserData = {
-            uid: firebaseUser.uid,
-            email: firebaseUser.email,
-            role: newUserRole,
-            createdAt: new Date(),
-          };
+          if (isSuperuser) {
+            const batch = writeBatch(db);
+            
+            // Create a default business for the superuser
+            const businessRef = doc(collection(db, 'businesses'));
+            batch.set(businessRef, {
+              name: 'Mi Negocio Principal',
+              owner: firebaseUser.uid,
+              createdAt: new Date(),
+            });
 
-          // For superuser, we might not have a businessId initially.
-          // It can be created/assigned later.
-          if (!isSuperuser) {
-             // For normal users, a businessId should be assigned on creation,
-             // but here we mark them as unknown until assigned.
+            // Create the superuser's user document
+            const newUserData = {
+                uid: firebaseUser.uid,
+                email: firebaseUser.email,
+                role: 'superuser',
+                createdAt: new Date(),
+                businessId: businessRef.id,
+            };
+            batch.set(userDocRef, newUserData);
+
+            await batch.commit();
+            setUser(newUserData);
+
+          } else {
+             // For normal users, mark them as unknown until assigned to a business.
+             const newUserData = {
+                uid: firebaseUser.uid,
+                email: firebaseUser.email,
+                role: 'unknown',
+                createdAt: new Date(),
+             };
+             await setDoc(userDocRef, newUserData);
+             setUser(newUserData as AppUser);
           }
-
-          await setDoc(userDocRef, newUserData);
-          setUser({
-              ...newUserData
-          });
         }
       } else {
         setUser(null);

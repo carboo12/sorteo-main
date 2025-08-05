@@ -23,9 +23,14 @@ export default function DashboardHomePage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (authLoading || !user?.businessId) return;
+    if (authLoading) return;
 
     const fetchStats = async () => {
+      if (!user?.businessId) {
+        setLoading(false);
+        return;
+      }
+        
       setLoading(true);
       try {
         const { date } = getCurrentTurno();
@@ -55,7 +60,7 @@ export default function DashboardHomePage() {
     fetchStats();
   }, [authLoading, user]);
 
-  if (authLoading || loading) {
+  if (authLoading || (loading && user?.businessId)) {
     return (
       <DashboardLayout>
         <div className="flex justify-center items-center h-full">
@@ -63,6 +68,26 @@ export default function DashboardHomePage() {
         </div>
       </DashboardLayout>
     );
+  }
+  
+  if (!user?.businessId) {
+    return (
+        <DashboardLayout>
+            <div className="flex justify-center items-center h-full p-8">
+                 <Card>
+                    <CardHeader>
+                        <CardTitle>Sin Asignación de Negocio</CardTitle>
+                        <CardDescription>
+                            No estás asignado a ningún negocio todavía.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <p>Por favor, contacta al superusuario para que te asigne a un negocio y puedas empezar a operar.</p>
+                    </CardContent>
+                 </Card>
+            </div>
+        </DashboardLayout>
+    )
   }
 
   return (
