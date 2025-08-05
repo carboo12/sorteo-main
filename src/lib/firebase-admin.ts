@@ -1,5 +1,7 @@
 
 import * as e from 'firebase-admin';
+import * as path from 'path';
+import * as fs from 'fs';
 
 // Helper function to initialize the admin app, ensuring it's only done once.
 function initializeAdminApp() {
@@ -7,27 +9,30 @@ function initializeAdminApp() {
     return e.app();
   }
 
-  const privateKey = (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n');
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+  try {
+    // Usar el archivo de cuenta de servicio es el método más robusto.
+    const serviceAccountPath = path.resolve(process.cwd(), 'service-account.json');
+    
+    if (!fs.existsSync(serviceAccountPath)) {
+        console.warn('El archivo service-account.json no se encontró. El Admin SDK no se inicializará. Por favor, descárgalo de tu consola de Firebase y colócalo en la raíz del proyecto.');
+        return null;
+    }
 
-  if (projectId && clientEmail && privateKey) {
-    try {
-      return e.initializeApp({
-        credential: e.credential.cert({
-          projectId,
-          clientEmail,
-          privateKey,
-        }),
-        databaseURL: `https://${projectId}.firebaseio.com`,
-      });
-    } catch (error: any) {
-      console.error('Firebase Admin SDK Initialization Error:', error.message);
-      // We don't throw here, so getSafeFirestore/getSafeAuth will throw a clearer error.
+    const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
+    
+    // Verifica que el archivo no esté vacío o con placeholders
+    if (!serviceAccount.project_id || serviceAccount.project_id === "TU_PROJECT_ID_AQUI") {
+      console.warn('El archivo service-account.json parece no estar configurado. Por favor, rellénalo con tus credenciales de Firebase.');
       return null;
     }
-  } else {
-    console.warn('Firebase Admin SDK credentials are not set in .env.local. Admin features will not be available.');
+
+    return e.initializeApp({
+      credential: e.credential.cert(serviceAccount),
+      databaseURL: `https://${serviceAccount.project_id}.firebaseio.com`,
+    });
+  } catch (error: any) {
+    console.error('Firebase Admin SDK Initialization Error:', error.message);
+    // Devolvemos null para que la siguiente función lance un error claro.
     return null;
   }
 }
