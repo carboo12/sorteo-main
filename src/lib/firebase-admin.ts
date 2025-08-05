@@ -1,4 +1,4 @@
-'use server';
+
 import * as e from 'firebase-admin';
 
 // Ensure you have a .env.local file with these variables defined
