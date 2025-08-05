@@ -1,6 +1,5 @@
-
 'use server';
-import *e from 'firebase-admin';
+import * as e from 'firebase-admin';
 
 if (e.apps.length === 0) {
   e.initializeApp({
