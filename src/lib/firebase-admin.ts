@@ -2,14 +2,13 @@
 'use server';
 
 import * as admin from 'firebase-admin';
-import { config } from 'dotenv';
 
-// Carga las variables de entorno desde el archivo .env
-config();
+// This function should be called ONLY after environment variables are loaded.
+function initializeFirebaseAdmin() {
+  if (admin.apps.length > 0) {
+    return;
+  }
 
-// Solo intenta inicializar si las credenciales esenciales están presentes
-// y si no hay ninguna aplicación ya inicializada.
-if (!admin.apps.length) {
   const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
   if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && privateKey) {
@@ -25,11 +24,16 @@ if (!admin.apps.length) {
       console.error('Error al inicializar Firebase Admin SDK:', error);
     }
   } else {
+    // This warning is helpful for debugging missing environment variables.
     console.warn('Credenciales de Firebase Admin incompletas. El SDK no se inicializará en el servidor.');
   }
 }
 
-// Exporta una función que obtiene la instancia de Firestore de forma segura.
+// Initialize on module load.
+initializeFirebaseAdmin();
+
+
+// Export a function that safely gets the Firestore instance.
 const getAdminFirestore = () => {
     if (!admin.apps.length) {
         throw new Error('Firebase Admin SDK no está inicializado. Verifica tus variables de entorno del servidor.');
@@ -44,8 +48,6 @@ const getAdminAuth = () => {
     return admin.auth();
 }
 
-// Exporta las instancias para ser usadas en otras partes de la aplicación de servidor.
-// Se invocarán las funciones para lanzar un error si la inicialización falló.
 const adminFirestore = getAdminFirestore();
 const adminAuth = getAdminAuth();
 
