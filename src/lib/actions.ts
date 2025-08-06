@@ -10,14 +10,13 @@ import {
   runTransaction,
   collection,
   getDocs,
-  Timestamp as ClientTimestamp, // Keep client-side timestamp for client-side operations if needed
-  serverTimestamp,
+  Timestamp as ClientTimestamp,
   addDoc,
   query,
 } from 'firebase/firestore';
 import { firestore as clientFirestore } from './firebase'; 
-import { adminFirestore } from './firebase-admin'; // Admin SDK for privileged actions
-import { Timestamp as AdminTimestamp } from 'firebase-admin/firestore'; // Import Admin Timestamp
+import { adminFirestore } from './firebase-admin';
+import { Timestamp as AdminTimestamp } from 'firebase-admin/firestore';
 import { selectWinningNumber } from '@/ai/flows/select-winning-number';
 import type { TurnoData, Winner, Ticket, TurnoInfo, Business, Location } from './types';
 
@@ -91,15 +90,17 @@ export async function buyTicket(
       const newTicket = {
         number,
         name: name || 'Anónimo',
-        purchasedAt: serverTimestamp(),
+        purchasedAt: AdminTimestamp.now(), // Use Admin Timestamp for server-side operations
       };
       
       const newTicketsArray = [...tickets, newTicket];
 
+      const updateData = { [`${turno}.tickets`]: newTicketsArray };
+
       if (!raffleDoc.exists()) {
         transaction.set(raffleDocRef, { [turno]: { tickets: newTicketsArray } });
       } else {
-        transaction.update(raffleDocRef, { [`${turno}.tickets`]: newTicketsArray });
+        transaction.update(raffleDocRef, updateData);
       }
     });
 
@@ -161,7 +162,7 @@ export async function drawWinner(
         transaction.update(raffleDocRef, {
             [`${turno}.winningNumber`]: winningNumber,
             [`${turno}.winnerName`]: winnerName,
-            [`${turno}.drawnAt`]: serverTimestamp(),
+            [`${turno}.drawnAt`]: AdminTimestamp.now(), // Use Admin Timestamp
         });
         
         if (historyDoc.exists()) {
