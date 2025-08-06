@@ -2,35 +2,35 @@
 'use server';
 
 import * as admin from 'firebase-admin';
-import serviceAccount from '../../service-account.json';
 
 function initializeFirebaseAdmin() {
   if (admin.apps.length > 0) {
     return;
   }
 
-  // Type assertion to satisfy the credential structure
-  const serviceAccountParams = {
-      projectId: serviceAccount.project_id,
-      clientEmail: serviceAccount.client_email,
-      privateKey: serviceAccount.private_key.replace(/\\n/g, '\n'),
-  }
+  const projectId = process.env.FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY;
 
-  if (!serviceAccountParams.projectId || !serviceAccountParams.clientEmail || !serviceAccountParams.privateKey) {
+  if (!projectId || !clientEmail || !privateKey) {
        throw new Error(
-        'El archivo service-account.json no está configurado correctamente o está vacío. ' +
-        'Por favor, copia el contenido completo de tu archivo JSON de cuenta de servicio de Firebase en service-account.json.'
+        'Las variables de entorno de Firebase Admin no están configuradas. ' +
+        'Asegúrate de que FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL y FIREBASE_PRIVATE_KEY están definidas.'
        );
   }
 
   try {
     admin.initializeApp({
-      credential: admin.credential.cert(serviceAccountParams),
+      credential: admin.credential.cert({
+        projectId,
+        clientEmail,
+        privateKey: privateKey.replace(/\\n/g, '\n'),
+      }),
     });
   } catch (error: any) {
     console.error('Error al inicializar Firebase Admin SDK:', error.message);
     throw new Error(
-      'No se pudo inicializar Firebase Admin. Verifica que el archivo service-account.json sea correcto. ' +
+      'No se pudo inicializar Firebase Admin. Verifica que las variables de entorno sean correctas. ' +
       `Error original: ${error.message}`
     );
   }
