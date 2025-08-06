@@ -8,15 +8,23 @@ function initializeFirebaseAdmin() {
     return;
   }
 
-  const cert = {
-    projectId: serviceAccount.project_id,
-    clientEmail: serviceAccount.client_email,
-    privateKey: serviceAccount.private_key,
+  // Comprobar si las credenciales parecen ser marcadores de posición
+  if (
+    !serviceAccount.project_id ||
+    serviceAccount.project_id.startsWith('DEPRECATED')
+  ) {
+    const errorMessage =
+      'El archivo service-account.json contiene credenciales de marcador de posición. ' +
+      'Por favor, reemplaza el contenido de service-account.json con tus credenciales reales de Firebase.';
+    console.error(errorMessage);
+    // Lanzamos un error descriptivo para que sea claro en los logs
+    throw new Error(errorMessage);
   }
 
   try {
     admin.initializeApp({
-      credential: admin.credential.cert(cert),
+      // El tipado de 'serviceAccount' es compatible con 'Credential'
+      credential: admin.credential.cert(serviceAccount as admin.ServiceAccount),
     });
   } catch (error: any) {
     console.error('Error al inicializar Firebase Admin SDK:', error.message);
