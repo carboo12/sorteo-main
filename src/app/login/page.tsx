@@ -42,7 +42,7 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
-        // 1. Find user by username in Firestore. This handles both superusers and regular users.
+        // 1. Find user by username (case-insensitive) in Firestore.
         const usersRef = collection(firestore, "users");
         const userQuery = query(usersRef, where("username", "==", username.toLowerCase()));
         const userSnapshot = await getDocs(userQuery);
