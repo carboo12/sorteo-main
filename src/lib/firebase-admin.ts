@@ -1,6 +1,4 @@
 
-'use server';
-
 import * as admin from 'firebase-admin';
 
 // Variable para almacenar la instancia de la app y evitar re-inicializaciones.
