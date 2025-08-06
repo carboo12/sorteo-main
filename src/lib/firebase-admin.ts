@@ -10,15 +10,17 @@ function initializeFirebaseAdmin() {
   }
 
   // Verifica que las propiedades necesarias existan en el service account
+  // Esto previene errores si el archivo está incompleto o tiene los placeholders.
   if (
     !serviceAccount.project_id ||
     !serviceAccount.client_email ||
-    !serviceAccount.private_key
+    !serviceAccount.private_key ||
+    serviceAccount.private_key.includes('DEPRECATED')
   ) {
-    throw new Error(
-      'El archivo service-account.json está incompleto o es inválido. ' +
-      'Asegúrate de que contenga project_id, client_email y private_key.'
-    );
+    console.error('El archivo service-account.json está incompleto o contiene valores de marcador de posición. Por favor, reemplázalo con tus credenciales reales de Firebase.');
+    // No lanzamos un error para evitar que la app crashee en un loop,
+    // pero la autenticación de admin fallará.
+    return;
   }
 
   try {
@@ -28,8 +30,9 @@ function initializeFirebaseAdmin() {
     });
   } catch (error: any) {
     console.error('Error al inicializar Firebase Admin SDK:', error.message);
+    // Este error es común si el formato del JSON es incorrecto.
     throw new Error(
-      'No se pudo inicializar Firebase Admin. Verifica que el archivo service-account.json sea correcto. ' +
+      'No se pudo inicializar Firebase Admin. Verifica que el archivo service-account.json sea correcto y no esté corrupto. ' +
       `Error original: ${error.message}`
     );
   }
