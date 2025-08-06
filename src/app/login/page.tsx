@@ -50,8 +50,9 @@ export default function LoginPage() {
 
       toast({ title: '¡Éxito!', description: 'Has iniciado sesión correctamente.' });
       
-      // Force navigation to ensure middleware picks up the change.
-      window.location.href = '/dashboard';
+      // Let the root page or middleware handle redirection based on auth state.
+      // This prevents race conditions.
+      router.push('/'); // Navigate to a neutral page to trigger re-evaluation.
 
     } catch (error: any) {
       let errorMessage = 'No se pudo iniciar sesión. Por favor, revisa tus credenciales.';
@@ -59,7 +60,7 @@ export default function LoginPage() {
          if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
              errorMessage = 'Correo electrónico o contraseña incorrectos.';
          } else if (error.code === 'auth/invalid-api-key' || error.code === 'auth/project-not-found' || error.code === 'auth/api-key-not-valid') {
-             errorMessage = `Error: ${error.code}. Revisa la configuración del proyecto en src/lib/firebase-config.ts.`;
+             errorMessage = `Error de Configuración: ${error.code}. Revisa que los valores en src/lib/firebase-config.ts sean correctos.`;
          } else {
              errorMessage = `Error: ${error.code}. Revisa tus credenciales o la configuración del proyecto.`;
          }
@@ -69,9 +70,7 @@ export default function LoginPage() {
         title: 'Error de autenticación',
         description: errorMessage,
       });
-    } finally {
-      // Keep loading true to prevent user interaction while redirecting
-      // setIsLoading(false);
+      setIsLoading(false);
     }
   };
 
