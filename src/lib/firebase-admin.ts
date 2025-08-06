@@ -5,6 +5,7 @@ import * as admin from 'firebase-admin';
 let app: admin.app.App;
 
 function initializeFirebaseAdmin() {
+  // Si ya hay apps inicializadas, no hacemos nada para evitar errores.
   if (admin.apps.length > 0) {
     return;
   }
