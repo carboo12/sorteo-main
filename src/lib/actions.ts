@@ -20,8 +20,6 @@ import { adminFirestore, adminAuth } from './firebase-admin-sdk';
 import { Timestamp as AdminTimestamp } from 'firebase-admin/firestore';
 import { selectWinningNumber } from '@/ai/flows/select-winning-number';
 import type { TurnoData, Winner, Ticket, TurnoInfo, Business, Location, AppUser } from './types';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from './firebase';
 
 const SUPERUSER_EMAIL = 'carboo12@gmail.com';
 
