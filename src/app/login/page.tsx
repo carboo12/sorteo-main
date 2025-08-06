@@ -38,15 +38,8 @@ export default function LoginPage() {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       
-      try {
-        const token = await userCredential.user.getIdToken();
-        document.cookie = `firebaseIdToken=${token}; path=/; max-age=3600`;
-      } catch (tokenError) {
-        console.error("Error getting ID token:", tokenError);
-        toast({ variant: 'destructive', title: 'Error de Sesión', description: 'No se pudo generar el token de sesión.' });
-        setIsLoading(false);
-        return;
-      }
+      const token = await userCredential.user.getIdToken();
+      document.cookie = `firebaseIdToken=${token}; path=/; max-age=3600`;
 
       toast({ title: '¡Éxito!', description: 'Has iniciado sesión correctamente.' });
       
@@ -68,7 +61,8 @@ export default function LoginPage() {
         title: 'Error de autenticación',
         description: errorMessage,
       });
-      setIsLoading(false);
+    } finally {
+        setIsLoading(false);
     }
   };
 
