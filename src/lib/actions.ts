@@ -26,6 +26,10 @@ import { auth } from './firebase';
 const SUPERUSER_EMAIL = 'carboo12@gmail.com';
 
 export async function signInWithUsername(username: string, password: string): Promise<{ success: boolean; message: string; user?: AppUser }> {
+    if (!adminFirestore || !adminAuth) {
+        return { success: false, message: "El servicio de autenticación del servidor no está disponible. Verifica las credenciales del servidor." };
+    }
+    
     try {
         const usersRef = adminFirestore.collection("users");
         // Firestore Admin SDK queries are case-sensitive. We query by lowercase username.
@@ -39,20 +43,15 @@ export async function signInWithUsername(username: string, password: string): Pr
 
         const userDoc = userSnapshot.docs[0];
         const userData = userDoc.data() as AppUser;
-        const userEmail = userData.email;
 
-        if (!userEmail) {
-            // This is a critical configuration error on our side
+        if (!userData.email) {
             return { success: false, message: "La cuenta de usuario está mal configurada. Contacta con el administrador." };
         }
         
-        // This is a workaround to validate the password using the client SDK.
-        // It's not ideal, but it's the only way without a custom token system or more complex setup.
-        // We are essentially using the server to find the email, then passing it back to the client.
-        // However, we cannot call client-side Firebase Auth from a server action.
-        // The responsibility must lie with the client to complete the sign in.
-        
-        // Let's pass the full user object back to the client so it can complete the sign-in.
+        // This is a workaround to validate the password using the client SDK's logic.
+        // It's not ideal, but it's a common pattern when you don't want to use custom tokens.
+        // We let the client-side sign-in do the actual password check.
+        // The server action's job is to find the email for a given username.
         return { success: true, message: "Usuario encontrado.", user: userData };
 
     } catch (error: any) {
@@ -160,6 +159,9 @@ export async function drawWinner(
 ): Promise<{ success: boolean; message: string; winningNumber?: number }> {
    if (!businessId) {
     return { success: false, message: "Business ID no encontrado." };
+  }
+  if (!adminFirestore) {
+    return { success: false, message: "El servicio de sorteos no está disponible. Verifica las credenciales del servidor." };
   }
    const raffleDocRef = doc(clientFirestore, 'businesses', businessId, 'raffles', date);
    const monthId = date.substring(0, 7); // YYYY-MM
@@ -271,6 +273,9 @@ export async function getWinnerHistory(businessId: string): Promise<Winner[]> {
 export async function createBusiness(
     data: Omit<Business, 'id' | 'createdAt'>
 ): Promise<{ success: boolean; message: string; businessId?: string }> {
+    if (!adminFirestore) {
+        return { success: false, message: "El servicio de creación de negocios no está disponible. Verifica las credenciales del servidor." };
+    }
     try {
         const businessData = {
             ...data,
@@ -286,6 +291,10 @@ export async function createBusiness(
 }
 
 export async function getBusinesses(): Promise<Business[]> {
+    if (!adminFirestore) {
+        console.error("El servicio de negocios no está disponible. Verifica las credenciales del servidor.");
+        return [];
+    }
     try {
         const businessesRef = adminFirestore.collection('businesses');
         const querySnapshot = await businessesRef.get();
@@ -309,6 +318,9 @@ export async function getBusinesses(): Promise<Business[]> {
 }
 
 export async function getOrCreateUser(uid: string, email: string | null): Promise<AppUser> {
+    if (!adminFirestore || !adminAuth) {
+        throw new Error("El servicio de usuarios no está disponible. Verifica las credenciales del servidor.");
+    }
     const userDocRef = adminFirestore.collection('users').doc(uid);
     
     try {
@@ -317,14 +329,12 @@ export async function getOrCreateUser(uid: string, email: string | null): Promis
 
         if (userDocSnap.exists()) {
             const userData = userDocSnap.data() as AppUser;
-            // Ensure superuser role is always correct
             if (isSuperuser && userData.role !== 'superuser') {
                 await userDocRef.update({ role: 'superuser' });
                 return { ...userData, role: 'superuser' };
             }
             return userData;
         } else {
-            // User does not exist, create a new document
             const role = isSuperuser ? 'superuser' : 'unknown';
             const username = email ? email.split('@')[0].toLowerCase() : `user_${uid.substring(0, 5)}`;
             
@@ -333,12 +343,9 @@ export async function getOrCreateUser(uid: string, email: string | null): Promis
                 email,
                 username: username,
                 role,
-                // businessId is not set on creation
             };
-            // The field for username is `nombre`
             await userDocRef.set({ ...newUser, nombre: username, createdAt: AdminTimestamp.now() });
             
-            // Also update the custom claims in Firebase Auth if it's a superuser
             if (isSuperuser) {
                 await adminAuth.setCustomUserClaims(uid, { role: 'superuser' });
             }
@@ -347,7 +354,6 @@ export async function getOrCreateUser(uid: string, email: string | null): Promis
         }
     } catch (error) {
         console.error("Error getting or creating user:", error);
-        // In case of error, throw it to be handled by the caller
         throw new Error("Failed to get or create user profile.");
     }
 }

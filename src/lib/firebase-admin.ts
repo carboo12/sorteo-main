@@ -15,34 +15,28 @@ function initializeFirebaseAdmin() {
 
   // Comprobación de seguridad para asegurar que no se están usando las credenciales de ejemplo
   if (!serviceAccountCredentials || serviceAccountCredentials.project_id === 'DEPRECATED - Reemplaza este archivo con tus credenciales') {
-    const errorMessage = 'El archivo service-account.json contiene credenciales de marcador de posición. Por favor, reemplaza el contenido de service-account.json con tus credenciales reales de Firebase.';
-    console.error(errorMessage);
-    // Lanzamos un error descriptivo para que sea claro en los logs
-    throw new Error(errorMessage);
+    // En lugar de lanzar un error que detiene la app, registramos el error y retornamos.
+    // La función que use el SDK de admin deberá manejar el caso de no estar inicializado.
+    console.error('El archivo service-account.json contiene credenciales de marcador de posición. El SDK de Admin no se inicializará.');
+    return null;
   }
 
   try {
-    // Aquí convertimos el objeto importado al tipo ServiceAccount esperado
     const serviceAccount = serviceAccountCredentials as ServiceAccount;
     
-    // Inicializamos la app de Admin con las credenciales importadas.
-    // Este método es el más robusto ya que el sistema de build de Next.js
-    // maneja correctamente el parseo del JSON.
     return admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
     });
   } catch (error: any) {
-    // Este bloque se ejecuta si la inicialización falla
-    console.error('Error al inicializar Firebase Admin:', error.message);
-    throw new Error(
-      `No se pudo inicializar Firebase Admin. Verifica que el archivo service-account.json sea correcto y no esté corrupto. Error original: ${error.message}`
-    );
+    console.error('Error al inicializar Firebase Admin SDK:', error.message);
+     // Devolvemos null para que la función que lo llame pueda manejar el error.
+    return null;
   }
 }
 
 // Invocamos la inicialización al cargar el módulo.
 const app = initializeFirebaseAdmin();
-const adminFirestore = admin.firestore();
-const adminAuth = admin.auth();
+const adminFirestore = app ? admin.firestore() : null;
+const adminAuth = app ? admin.auth() : null;
 
 export { admin, adminFirestore, adminAuth };
