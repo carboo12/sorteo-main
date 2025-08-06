@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -24,8 +25,6 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
 
-    // Check if Firebase is initialized correctly by checking a property.
-    // The error will be thrown from firebase.ts if config is missing.
     if (!auth.app) {
        toast({
         variant: 'destructive',
@@ -38,11 +37,19 @@ export default function LoginPage() {
 
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const token = await userCredential.user.getIdToken();
       
+      try {
+        const token = await userCredential.user.getIdToken();
+        document.cookie = `firebaseIdToken=${token}; path=/; max-age=3600`;
+      } catch (tokenError) {
+        console.error("Error getting ID token:", tokenError);
+        toast({ variant: 'destructive', title: 'Error de Sesión', description: 'No se pudo generar el token de sesión.' });
+        setIsLoading(false);
+        return;
+      }
+
       toast({ title: '¡Éxito!', description: 'Has iniciado sesión correctamente.' });
-      document.cookie = `firebaseIdToken=${token}; path=/; max-age=3600`;
-      router.push('/dashboard');
+      router.replace('/dashboard');
 
     } catch (error: any) {
       let errorMessage = 'No se pudo iniciar sesión. Por favor, revisa tus credenciales.';

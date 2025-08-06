@@ -11,12 +11,17 @@ export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading) {
-      if (user) {
-        router.replace('/dashboard');
-      } else {
-        router.replace('/login');
-      }
+    if (loading) {
+      // Still loading, do nothing.
+      return;
+    }
+
+    if (user) {
+      // If user exists, go to dashboard.
+      router.replace('/dashboard');
+    } else {
+      // If no user, go to login.
+      router.replace('/login');
     }
   }, [user, loading, router]);
 
