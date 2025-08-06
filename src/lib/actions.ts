@@ -24,7 +24,7 @@ import type { TurnoData, Winner, Ticket, TurnoInfo, Business, Location, AppUser 
 const SUPERUSER_EMAIL = 'carboo12@gmail.com';
 
 export async function signInWithUsername(username: string, password: string): Promise<{ success: boolean; message: string; user?: AppUser }> {
-    if (!adminFirestore || !adminAuth) {
+    if (!adminFirestore) {
         return { success: false, message: "El servicio de autenticación del servidor no está disponible. Verifica las credenciales del servidor." };
     }
     
@@ -316,7 +316,7 @@ export async function getBusinesses(): Promise<Business[]> {
 }
 
 export async function getOrCreateUser(uid: string, email: string | null): Promise<AppUser> {
-    if (!adminFirestore || !adminAuth) {
+    if (!adminFirestore) {
         throw new Error("El servicio de usuarios no está disponible. Verifica las credenciales del servidor.");
     }
     const userDocRef = adminFirestore.collection('users').doc(uid);
@@ -340,9 +340,10 @@ export async function getOrCreateUser(uid: string, email: string | null): Promis
                 uid,
                 email,
                 username: username,
+                nombre: username, // Adding 'nombre' field for consistency
                 role,
             };
-            await userDocRef.set({ ...newUser, nombre: username, createdAt: AdminTimestamp.now() });
+            await userDocRef.set({ ...newUser, createdAt: AdminTimestamp.now() });
             
             if (isSuperuser) {
                 await adminAuth.setCustomUserClaims(uid, { role: 'superuser' });

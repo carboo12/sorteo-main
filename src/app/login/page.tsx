@@ -19,7 +19,6 @@ import { useRouter } from 'next/navigation';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { login, getCurrentUser } from '@/lib/auth-client';
-import type { AppUser } from '@/lib/types';
 import { signInWithUsername } from '@/lib/actions';
 
 
@@ -46,7 +45,7 @@ export default function LoginPage() {
         const result = await signInWithUsername(username, password);
 
         if (!result.success || !result.user || !result.user.email) {
-            throw new Error(result.message);
+            throw new Error(result.message || 'Usuario o contraseña incorrectos.');
         }
 
         const appUser = result.user;
@@ -61,6 +60,7 @@ export default function LoginPage() {
             uid: firebaseUser.uid,
             email: appUser.email,
             username: appUser.username,
+            nombre: appUser.nombre,
             role: appUser.role,
             businessId: appUser.businessId
         });
@@ -74,7 +74,7 @@ export default function LoginPage() {
         
         if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
             errorMessage = "Usuario o contraseña incorrectos.";
-        } else if (error.message && !error.code) { // Use custom error message if available and it's not a Firebase auth code
+        } else if (error.message && !error.code) { // Use custom error message from server action
            errorMessage = error.message;
         }
 
