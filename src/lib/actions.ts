@@ -10,13 +10,14 @@ import {
   runTransaction,
   collection,
   getDocs,
-  Timestamp,
+  Timestamp as ClientTimestamp, // Keep client-side timestamp for client-side operations if needed
   serverTimestamp,
   addDoc,
   query,
 } from 'firebase/firestore';
-import { firestore as clientFirestore } from './firebase'; // Renamed to avoid confusion
+import { firestore as clientFirestore } from './firebase'; 
 import { adminFirestore } from './firebase-admin'; // Admin SDK for privileged actions
+import { Timestamp as AdminTimestamp } from 'firebase-admin/firestore'; // Import Admin Timestamp
 import { selectWinningNumber } from '@/ai/flows/select-winning-number';
 import type { TurnoData, Winner, Ticket, TurnoInfo, Business, Location } from './types';
 
@@ -199,7 +200,7 @@ export async function getWinnerHistory(businessId: string): Promise<Winner[]> {
             turno,
             winningNumber: data[turno].winningNumber,
             winnerName: data[turno].winnerName || 'Anónimo',
-            drawnAt: (data[turno].drawnAt as Timestamp).toDate(),
+            drawnAt: (data[turno].drawnAt as ClientTimestamp).toDate(),
           });
         }
       }
@@ -229,8 +230,8 @@ export async function createBusiness(
     try {
         const businessData = {
             ...data,
-            licenseExpiresAt: Timestamp.fromDate(new Date(data.licenseExpiresAt)),
-            createdAt: Timestamp.now()
+            licenseExpiresAt: AdminTimestamp.fromDate(new Date(data.licenseExpiresAt)),
+            createdAt: AdminTimestamp.now()
         };
         const docRef = await adminFirestore.collection("businesses").add(businessData);
         return { success: true, message: "Negocio creado con éxito", businessId: docRef.id };
@@ -251,7 +252,7 @@ export async function getBusinesses(): Promise<Business[]> {
                 name: data.name,
                 phone: data.phone,
                 ownerEmail: data.ownerEmail,
-                licenseExpiresAt: (data.licenseExpiresAt as Timestamp).toDate().toISOString(),
+                licenseExpiresAt: (data.licenseExpiresAt as AdminTimestamp).toDate().toISOString(),
                 address: data.address,
                 location: data.location,
                 createdAt: data.createdAt,
