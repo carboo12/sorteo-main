@@ -3,34 +3,28 @@
 import { getApp, getApps, initializeApp } from 'firebase/app';
 import { getAuth as getFirebaseAuth } from 'firebase/auth';
 import { getFirestore as getFirebaseFirestore } from 'firebase/firestore';
-
-const firebaseConfig = {
-    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-};
+import { firebaseConfig } from './firebase-config'; // Import the config directly
 
 let app;
 
-// Verifica si la configuración está completa antes de inicializar.
-// Esto es crucial para prevenir errores si el .env.local no está configurado.
-if (firebaseConfig.apiKey && firebaseConfig.projectId) {
+// This check is crucial to prevent errors.
+if (
+    firebaseConfig.apiKey && 
+    firebaseConfig.projectId && 
+    firebaseConfig.apiKey !== "YOUR_API_KEY"
+) {
     if (!getApps().length) {
         app = initializeApp(firebaseConfig);
     } else {
         app = getApp();
     }
 } else {
-    console.error("Error de configuración de Firebase: Las variables de entorno NEXT_PUBLIC_* no están cargadas. Asegúrate de que tu archivo .env.local esté configurado correctamente.");
-    // Creamos un objeto 'proxy' para que la app no crashee en el servidor durante la build,
-    // pero lanzará un error claro si se intenta usar en el cliente sin configuración.
+    console.error("Firebase configuration is missing or incomplete in src/lib/firebase-config.ts. Please update it with your project credentials.");
+    // Create a proxy to avoid crashes but show errors if used.
     app = new Proxy({}, {
         get: (target, prop) => {
             if (prop === '_isInitialized') return false;
-            throw new Error("Firebase no está inicializado. Revisa la configuración de tus variables de entorno NEXT_PUBLIC_*.");
+            throw new Error("Firebase is not initialized. Check your configuration in src/lib/firebase-config.ts.");
         }
     }) as any;
 }

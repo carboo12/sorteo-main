@@ -24,6 +24,18 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
 
+    // Check if Firebase is initialized correctly by checking a property.
+    // The error will be thrown from firebase.ts if config is missing.
+    if (!auth.app) {
+       toast({
+        variant: 'destructive',
+        title: 'Error de Configuración',
+        description: 'La configuración de Firebase no se ha cargado. Revisa el archivo src/lib/firebase-config.ts',
+      });
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const token = await userCredential.user.getIdToken();
@@ -37,8 +49,8 @@ export default function LoginPage() {
        if (error.code) {
          if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
              errorMessage = 'Correo electrónico o contraseña incorrectos.';
-         } else if (error.code === 'auth/invalid-api-key' || error.code === 'auth/project-not-found') {
-             errorMessage = `Error de configuración de Firebase: ${error.code}. Revisa las variables NEXT_PUBLIC en tu archivo .env.local`;
+         } else if (error.code === 'auth/invalid-api-key' || error.code === 'auth/project-not-found' || error.code === 'auth/api-key-not-valid') {
+             errorMessage = `Error: ${error.code}. Revisa la configuración del proyecto en src/lib/firebase-config.ts.`;
          } else {
              errorMessage = `Error: ${error.code}. Revisa tus credenciales o la configuración del proyecto.`;
          }
