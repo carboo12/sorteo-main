@@ -26,21 +26,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     if (firebaseUser) {
       // User is signed in with Firebase.
-      // Now, get or create their profile from our backend (Firestore).
+      // Now, get or create their profile from our backend (Firestore) using a server action.
       try {
         const appUser = await getOrCreateUser(firebaseUser.uid, firebaseUser.email);
         
         if (appUser) {
             const token = await firebaseUser.getIdToken();
+            // Set cookie for server-side authentication if needed
             document.cookie = `firebaseIdToken=${token}; path=/; max-age=3600`;
-            localLogin(appUser); // Sync with localStorage
+            localLogin(appUser); // Sync with localStorage for client-side state
             setUser(appUser);
         } else {
-            // This case might happen if getOrCreateUser returns null (e.g., an error)
+            // This case might happen if getOrCreateUser fails
             await auth.signOut(); // Log out the user to prevent an inconsistent state
         }
       } catch (error) {
-        console.error("Error syncing user profile:", error);
+        console.error("Error syncing user profile with server action:", error);
         await auth.signOut(); // Log out on error
       }
     } else {
@@ -58,7 +59,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (currentUser) {
       setUser(currentUser);
     }
-    setLoading(false); 
+    setLoading(true); // Set loading to true until auth state is confirmed
 
     // Subscribe to Firebase auth state changes
     const unsubscribe = onAuthStateChanged(auth, handleAuthStateChange);

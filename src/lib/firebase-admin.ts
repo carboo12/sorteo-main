@@ -8,9 +8,16 @@ function initializeFirebaseAdmin() {
     return;
   }
 
+  // Verificar si las credenciales son las de marcador de posición
+  if (serviceAccount.project_id === 'DEPRECATED - Reemplaza este archivo con tus credenciales') {
+    const errorMessage = 'El archivo service-account.json contiene credenciales de marcador de posición. Por favor, reemplaza el contenido de service-account.json con tus credenciales reales de Firebase.';
+    // No lanzamos un error para evitar que la app crashee, solo lo mostramos en consola.
+    // La app fallará de todas formas en la inicialización, pero con un error de Firebase más claro.
+    console.error(errorMessage);
+  }
+
   try {
     admin.initializeApp({
-      // El tipado de 'serviceAccount' es compatible con 'Credential'
       credential: admin.credential.cert(serviceAccount as admin.ServiceAccount),
     });
   } catch (error: any) {

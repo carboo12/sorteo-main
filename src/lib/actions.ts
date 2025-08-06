@@ -292,6 +292,12 @@ export async function getOrCreateUser(uid: string, email: string | null): Promis
                 // businessId is not set on creation
             };
             await userDocRef.set({ ...newUser, createdAt: AdminTimestamp.now() });
+            
+            // Also update the custom claims in Firebase Auth if it's a superuser
+            if (isSuperuser) {
+                await adminAuth.setCustomUserClaims(uid, { role: 'superuser' });
+            }
+
             return newUser;
         }
     } catch (error) {
