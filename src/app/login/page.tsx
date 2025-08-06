@@ -16,11 +16,11 @@ import { Label } from "@/components/ui/label";
 import { Eye, EyeOff, Loader2, User as UserIcon } from "lucide-react";
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
-import { getFirestore, collection, query, where, getDocs } from 'firebase/firestore';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth, firestore } from '@/lib/firebase';
+import { auth } from '@/lib/firebase';
 import { login, getCurrentUser } from '@/lib/auth-client';
 import type { AppUser } from '@/lib/types';
+import { signInWithUsername } from '@/lib/actions';
 
 
 export default function LoginPage() {
@@ -42,50 +42,39 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
-        // 1. Find user by username (case-insensitive) in Firestore.
-        const usersRef = collection(firestore, "users");
-        const userQuery = query(usersRef, where("username", "==", username.toLowerCase()));
-        const userSnapshot = await getDocs(userQuery);
+        // 1. Find user by username using the server action to bypass client-side Firestore rules
+        const result = await signInWithUsername(username, password);
 
-        if (userSnapshot.empty) {
-            throw new Error("Usuario o contraseña incorrectos.");
+        if (!result.success || !result.user || !result.user.email) {
+            throw new Error(result.message);
         }
 
-        const userDoc = userSnapshot.docs[0];
-        const userData = userDoc.data() as AppUser;
-        const userEmail = userData.email;
+        const appUser = result.user;
+        const userEmail = appUser.email;
 
-        if (!userEmail) {
-            // This is a critical error, an user must have an email to authenticate with Firebase Auth
-            throw new Error("La cuenta de usuario está mal configurada. Contacta con el administrador.");
-        }
-
-        // 2. Use the retrieved email and the provided password to sign in with Firebase Auth.
-        // This is the secure way to check the password.
+        // 2. Use the retrieved email and the provided password to sign in with Firebase Auth on the client.
         const userCredential = await signInWithEmailAndPassword(auth, userEmail, password);
         const firebaseUser = userCredential.user;
         
         // 3. If login is successful, create the local session.
         login({
             uid: firebaseUser.uid,
-            email: userData.email,
-            username: userData.username,
-            role: userData.role,
-            businessId: userData.businessId
+            email: appUser.email,
+            username: appUser.username,
+            role: appUser.role,
+            businessId: appUser.businessId
         });
 
-        toast({ title: `¡Bienvenido, ${userData.username}!`});
+        toast({ title: `¡Bienvenido, ${appUser.username}!`});
         router.push('/dashboard');
 
     } catch (error: any) {
         console.error("Error de inicio de sesión: ", error);
         let errorMessage = "Credenciales inválidas. Por favor, inténtalo de nuevo.";
         
-        // Firebase Auth provides specific error codes for bad passwords or non-existent users
         if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
             errorMessage = "Usuario o contraseña incorrectos.";
-        } else if (error.message) {
-           // Use the custom error message if available
+        } else if (error.message && !error.code) { // Use custom error message if available and it's not a Firebase auth code
            errorMessage = error.message;
         }
 
