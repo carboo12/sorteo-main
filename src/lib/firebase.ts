@@ -9,24 +9,18 @@ let app;
 
 // This check is crucial to prevent errors.
 if (
-    firebaseConfig.apiKey && 
-    firebaseConfig.projectId && 
-    firebaseConfig.apiKey !== "YOUR_API_KEY"
+    !firebaseConfig ||
+    !firebaseConfig.apiKey || 
+    !firebaseConfig.projectId || 
+    firebaseConfig.apiKey.startsWith("AIzaSy") === false // A simple check for a valid-looking API key
 ) {
-    if (!getApps().length) {
-        app = initializeApp(firebaseConfig);
-    } else {
-        app = getApp();
-    }
+    throw new Error("Firebase configuration is missing or incomplete in src/lib/firebase-config.ts. Please copy firebase-config.example.ts to firebase-config.ts and fill in your project credentials.");
+}
+
+if (!getApps().length) {
+    app = initializeApp(firebaseConfig);
 } else {
-    console.error("Firebase configuration is missing or incomplete in src/lib/firebase-config.ts. Please update it with your project credentials.");
-    // Create a proxy to avoid crashes but show errors if used.
-    app = new Proxy({}, {
-        get: (target, prop) => {
-            if (prop === '_isInitialized') return false;
-            throw new Error("Firebase is not initialized. Check your configuration in src/lib/firebase-config.ts.");
-        }
-    }) as any;
+    app = getApp();
 }
 
 const auth = getFirebaseAuth(app);
