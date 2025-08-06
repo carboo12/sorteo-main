@@ -8,19 +8,6 @@ function initializeFirebaseAdmin() {
     return;
   }
 
-  // Comprobar si las credenciales parecen ser marcadores de posición
-  if (
-    !serviceAccount.project_id ||
-    serviceAccount.project_id.startsWith('DEPRECATED')
-  ) {
-    const errorMessage =
-      'El archivo service-account.json contiene credenciales de marcador de posición. ' +
-      'Por favor, reemplaza el contenido de service-account.json con tus credenciales reales de Firebase.';
-    console.error(errorMessage);
-    // Lanzamos un error descriptivo para que sea claro en los logs
-    throw new Error(errorMessage);
-  }
-
   try {
     admin.initializeApp({
       // El tipado de 'serviceAccount' es compatible con 'Credential'
@@ -28,8 +15,9 @@ function initializeFirebaseAdmin() {
     });
   } catch (error: any) {
     console.error('Error al inicializar Firebase Admin SDK:', error.message);
+    // Re-lanzamos el error original de Firebase para que sea más claro
     throw new Error(
-      'No se pudo inicializar Firebase Admin. Verifica que el archivo service-account.json sea correcto. ' +
+      'No se pudo inicializar Firebase Admin. Verifica que el archivo service-account.json sea correcto y no esté corrupto. ' +
       `Error original: ${error.message}`
     );
   }
