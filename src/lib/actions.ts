@@ -1,9 +1,6 @@
 
 'use server';
 
-import { config } from 'dotenv';
-config(); // Load environment variables at the very top
-
 import {
   doc,
   getDoc,
