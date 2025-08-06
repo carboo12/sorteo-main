@@ -16,7 +16,7 @@ import {
   where,
 } from 'firebase/firestore';
 import { firestore as clientFirestore } from './firebase'; 
-import { adminFirestore, adminAuth } from './firebase-admin';
+import { adminFirestore, adminAuth } from './firebase-admin-sdk';
 import { Timestamp as AdminTimestamp } from 'firebase-admin/firestore';
 import { selectWinningNumber } from '@/ai/flows/select-winning-number';
 import type { TurnoData, Winner, Ticket, TurnoInfo, Business, Location, AppUser } from './types';
