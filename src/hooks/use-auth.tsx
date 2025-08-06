@@ -3,13 +3,10 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { auth, firestore } from '@/lib/firebase';
+import { auth, getFirebaseApp } from '@/lib/firebase';
 import { getCurrentUser, login as localLogin, signOutUser as localSignOut } from '@/lib/auth-client';
+import { getOrCreateUser } from '@/lib/actions';
 import type { AppUser } from '@/lib/types';
-import { getFirebaseApp } from '@/lib/firebase'; // Import the new function
-
-const SUPERUSER_EMAIL = 'carboo12@gmail.com';
 
 interface AuthContextType {
   user: AppUser | null;
@@ -23,70 +20,50 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const syncUser = useCallback(async (firebaseUser: FirebaseUser | null) => {
-    // Ensure Firebase is initialized before proceeding
+  const handleAuthStateChange = useCallback(async (firebaseUser: FirebaseUser | null) => {
+    // Ensure Firebase client app is initialized before doing anything
     getFirebaseApp();
-
+    
     if (firebaseUser) {
-        const token = await firebaseUser.getIdToken();
-        document.cookie = `firebaseIdToken=${token}; path=/; max-age=3600`;
-
-        const userDocRef = doc(firestore, 'users', firebaseUser.uid);
-        const userDocSnap = await getDoc(userDocRef);
+      // User is signed in with Firebase.
+      // Now, get or create their profile from our backend (Firestore).
+      try {
+        const appUser = await getOrCreateUser(firebaseUser.uid, firebaseUser.email);
         
-        const isSuperuser = firebaseUser.email === SUPERUSER_EMAIL;
-        let role: AppUser['role'] = isSuperuser ? 'superuser' : 'unknown';
-        let businessId: string | undefined = undefined;
-        
-        if (userDocSnap.exists()) {
-          const userData = userDocSnap.data();
-          if (!isSuperuser) {
-            role = userData.role || 'unknown';
-          }
-          businessId = userData.businessId;
-
-          if (userData.role !== role) {
-             await setDoc(userDocRef, { role: role }, { merge: true });
-          }
+        if (appUser) {
+            const token = await firebaseUser.getIdToken();
+            document.cookie = `firebaseIdToken=${token}; path=/; max-age=3600`;
+            localLogin(appUser); // Sync with localStorage
+            setUser(appUser);
         } else {
-           await setDoc(userDocRef, {
-             uid: firebaseUser.uid,
-             email: firebaseUser.email,
-             role: role,
-             createdAt: new Date(),
-           });
+            // This case might happen if getOrCreateUser returns null (e.g., an error)
+            await auth.signOut(); // Log out the user to prevent an inconsistent state
         }
-        
-        const appUser: AppUser = {
-            uid: firebaseUser.uid,
-            email: firebaseUser.email,
-            role: role,
-            businessId: businessId,
-        };
-        
-        localLogin(appUser); // Sincroniza con localStorage
-        setUser(appUser);
+      } catch (error) {
+        console.error("Error syncing user profile:", error);
+        await auth.signOut(); // Log out on error
+      }
     } else {
-        localSignOut(); // Limpia localStorage
-        setUser(null);
-        document.cookie = 'firebaseIdToken=; path=/; max-age=-1';
+      // User is signed out.
+      document.cookie = 'firebaseIdToken=; path=/; max-age=-1';
+      localSignOut(); // Clear localStorage
+      setUser(null);
     }
     setLoading(false);
   }, []);
 
-
   useEffect(() => {
-    // Sincronización inicial desde localStorage para renderizado rápido
+    // Initial sync from localStorage for fast UI rendering
     const currentUser = getCurrentUser();
     if (currentUser) {
       setUser(currentUser);
     }
-    setLoading(false); // Dejar de cargar rápido para evitar pantalla en blanco
+    setLoading(false); 
 
-    // Firebase onAuthStateChanged para validación y actualización en segundo plano
-    const unsubscribe = onAuthStateChanged(auth, syncUser);
+    // Subscribe to Firebase auth state changes
+    const unsubscribe = onAuthStateChanged(auth, handleAuthStateChange);
 
-    // Escuchar cambios en localStorage para sincronizar entre pestañas
+    // Sync across tabs
     const handleStorageChange = () => {
         const updatedUser = getCurrentUser();
         setUser(updatedUser);
@@ -97,10 +74,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         unsubscribe();
         window.removeEventListener('storage', handleStorageChange);
     };
-  }, [syncUser]);
+  }, [handleAuthStateChange]);
 
   const signOut = async () => {
-    await auth.signOut(); // Esto disparará el onAuthStateChanged y limpiará todo
+    await auth.signOut(); // This will trigger onAuthStateChanged and clear everything.
   };
 
   return (

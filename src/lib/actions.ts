@@ -15,10 +15,12 @@ import {
   query,
 } from 'firebase/firestore';
 import { firestore as clientFirestore } from './firebase'; 
-import { adminFirestore } from './firebase-admin';
+import { adminFirestore, adminAuth } from './firebase-admin';
 import { Timestamp as AdminTimestamp } from 'firebase-admin/firestore';
 import { selectWinningNumber } from '@/ai/flows/select-winning-number';
-import type { TurnoData, Winner, Ticket, TurnoInfo, Business, Location } from './types';
+import type { TurnoData, Winner, Ticket, TurnoInfo, Business, Location, AppUser } from './types';
+
+const SUPERUSER_EMAIL = 'carboo12@gmail.com';
 
 function safeParseTurnoData(data: any): TurnoData {
   const tickets = (data?.tickets || []).map((ticket: any) => ({
@@ -90,7 +92,7 @@ export async function buyTicket(
       const newTicket = {
         number,
         name: name || 'Anónimo',
-        purchasedAt: AdminTimestamp.now(), // Use Admin Timestamp for server-side operations
+        purchasedAt: new Date(), // Use standard Date object here
       };
       
       const newTicketsArray = [...tickets, newTicket];
@@ -162,7 +164,7 @@ export async function drawWinner(
         transaction.update(raffleDocRef, {
             [`${turno}.winningNumber`]: winningNumber,
             [`${turno}.winnerName`]: winnerName,
-            [`${turno}.drawnAt`]: AdminTimestamp.now(), // Use Admin Timestamp
+            [`${turno}.drawnAt`]: AdminTimestamp.now(), 
         });
         
         if (historyDoc.exists()) {
@@ -262,5 +264,38 @@ export async function getBusinesses(): Promise<Business[]> {
     } catch (error) {
         console.error("Error fetching businesses:", error);
         return [];
+    }
+}
+
+export async function getOrCreateUser(uid: string, email: string | null): Promise<AppUser | null> {
+    const userDocRef = adminFirestore.collection('users').doc(uid);
+    
+    try {
+        const userDocSnap = await userDocRef.get();
+        const isSuperuser = email === SUPERUSER_EMAIL;
+
+        if (userDocSnap.exists()) {
+            const userData = userDocSnap.data() as AppUser;
+            // Ensure superuser role is always correct
+            if (isSuperuser && userData.role !== 'superuser') {
+                await userDocRef.update({ role: 'superuser' });
+                return { ...userData, role: 'superuser' };
+            }
+            return userData;
+        } else {
+            // User does not exist, create a new document
+            const role = isSuperuser ? 'superuser' : 'unknown';
+            const newUser: AppUser = {
+                uid,
+                email,
+                role,
+                // businessId is not set on creation
+            };
+            await userDocRef.set({ ...newUser, createdAt: AdminTimestamp.now() });
+            return newUser;
+        }
+    } catch (error) {
+        console.error("Error getting or creating user:", error);
+        return null; // Return null on error
     }
 }
