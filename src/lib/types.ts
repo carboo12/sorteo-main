@@ -45,6 +45,7 @@ export interface Business {
 export interface AppUser {
   uid: string;
   email: string | null;
+  username: string;
   role: 'superuser' | 'admin' | 'seller' | 'unknown';
   businessId?: string;
 }

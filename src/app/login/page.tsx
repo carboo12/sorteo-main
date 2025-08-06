@@ -32,7 +32,6 @@ export default function LoginPage() {
   const router = useRouter();
 
   useEffect(() => {
-    // Si el usuario ya ha iniciado sesión, redirigir al dashboard
     if (getCurrentUser()) {
       router.replace('/dashboard');
     }
@@ -43,40 +42,13 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
-        // 1. Verificar si es Superusuario en 'users' con role 'superuser'
-        const superuserQuery = query(collection(firestore, "users"), where("email", "==", username.toLowerCase()), where("role", "==", "superuser"));
-        const superuserSnapshot = await getDocs(superuserQuery);
-        
-        // Asumimos que el email del superusuario también puede ser su "username" para el login.
-        if (!superuserSnapshot.empty) {
-            try {
-                 // Intentar iniciar sesión con Firebase Auth directamente
-                await signInWithEmailAndPassword(auth, username, password);
-                const userDoc = superuserSnapshot.docs[0];
-                const userData = userDoc.data() as AppUser;
-
-                login({
-                    uid: userDoc.id,
-                    email: userData.email,
-                    role: 'superuser',
-                    businessId: userData.businessId
-                });
-
-                toast({ title: `¡Bienvenido, Superusuario!`});
-                router.push('/dashboard');
-                return;
-            } catch (authError) {
-                 // Si falla, el password es incorrecto. Cae al error general.
-                 throw new Error("Credenciales de superusuario incorrectas.");
-            }
-        }
-        
-        // 2. Si no es superusuario, buscar usuario regular por email en la colección 'users'
-        const userQuery = query(collection(firestore, "users"), where("email", "==", username.toLowerCase()));
+        // 1. Find user by username in Firestore. This handles both superusers and regular users.
+        const usersRef = collection(firestore, "users");
+        const userQuery = query(usersRef, where("username", "==", username.toLowerCase()));
         const userSnapshot = await getDocs(userQuery);
 
         if (userSnapshot.empty) {
-            throw new Error("Credenciales inválidas.");
+            throw new Error("Usuario o contraseña incorrectos.");
         }
 
         const userDoc = userSnapshot.docs[0];
@@ -84,32 +56,36 @@ export default function LoginPage() {
         const userEmail = userData.email;
 
         if (!userEmail) {
-            throw new Error("El usuario no tiene un correo electrónico configurado para iniciar sesión.");
+            // This is a critical error, an user must have an email to authenticate with Firebase Auth
+            throw new Error("La cuenta de usuario está mal configurada. Contacta con el administrador.");
         }
 
-        // Usar Firebase Auth para iniciar sesión
+        // 2. Use the retrieved email and the provided password to sign in with Firebase Auth.
+        // This is the secure way to check the password.
         const userCredential = await signInWithEmailAndPassword(auth, userEmail, password);
         const firebaseUser = userCredential.user;
-
-        // Si el inicio de sesión es exitoso, crear sesión local
+        
+        // 3. If login is successful, create the local session.
         login({
             uid: firebaseUser.uid,
             email: userData.email,
+            username: userData.username,
             role: userData.role,
             businessId: userData.businessId
         });
 
-        toast({ title: `¡Bienvenido!`});
+        toast({ title: `¡Bienvenido, ${userData.username}!`});
         router.push('/dashboard');
 
     } catch (error: any) {
         console.error("Error de inicio de sesión: ", error);
         let errorMessage = "Credenciales inválidas. Por favor, inténtalo de nuevo.";
-        if (error.code) {
-          if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
-             errorMessage = "Usuario o contraseña incorrectos.";
-          }
+        
+        // Firebase Auth provides specific error codes for bad passwords or non-existent users
+        if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+            errorMessage = "Usuario o contraseña incorrectos.";
         } else if (error.message) {
+           // Use the custom error message if available
            errorMessage = error.message;
         }
 
@@ -134,11 +110,11 @@ export default function LoginPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="username">Usuario (Email)</Label>
+                <Label htmlFor="username">Nombre de Usuario</Label>
                 <Input
                   id="username"
-                  type="email"
-                  placeholder="tu@email.com"
+                  type="text"
+                  placeholder="tu-usuario"
                   required
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}

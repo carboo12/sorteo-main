@@ -267,7 +267,7 @@ export async function getBusinesses(): Promise<Business[]> {
     }
 }
 
-export async function getOrCreateUser(uid: string, email: string | null): Promise<AppUser | null> {
+export async function getOrCreateUser(uid: string, email: string | null): Promise<AppUser> {
     const userDocRef = adminFirestore.collection('users').doc(uid);
     
     try {
@@ -285,9 +285,12 @@ export async function getOrCreateUser(uid: string, email: string | null): Promis
         } else {
             // User does not exist, create a new document
             const role = isSuperuser ? 'superuser' : 'unknown';
+            const username = email ? email.split('@')[0].toLowerCase() : `user_${uid.substring(0, 5)}`;
+            
             const newUser: AppUser = {
                 uid,
                 email,
+                username: username,
                 role,
                 // businessId is not set on creation
             };
@@ -302,6 +305,7 @@ export async function getOrCreateUser(uid: string, email: string | null): Promis
         }
     } catch (error) {
         console.error("Error getting or creating user:", error);
-        return null; // Return null on error
+        // In case of error, throw it to be handled by the caller
+        throw new Error("Failed to get or create user profile.");
     }
 }
