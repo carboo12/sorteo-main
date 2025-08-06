@@ -2,26 +2,26 @@
 import * as admin from 'firebase-admin';
 
 function initializeFirebaseAdmin() {
-  // Si ya hay apps inicializadas, significa que el SDK ya se configuró.
-  // No hacemos nada para evitar errores de re-inicialización.
+  // Si ya hay apps inicializadas, no hacemos nada para evitar errores.
   if (admin.apps.length > 0) {
     return;
   }
 
   try {
-    // El SDK buscará automáticamente las credenciales en el entorno.
-    // Este es el método más robusto para entornos de servidor como Vercel, Firebase, etc.
-    // Se basa en la variable de entorno GOOGLE_APPLICATION_CREDENTIALS que apunta al service-account.json
-    admin.initializeApp();
-  } catch (error: any) {
-    console.error('Error al inicializar Firebase Admin SDK:', error.message);
-    if (error.code === 'app/duplicate-app') {
-        // Este error es seguro de ignorar, significa que otro proceso ya lo inicializó.
-        return;
+    const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+    if (!serviceAccountJson) {
+      throw new Error('La variable de entorno FIREBASE_SERVICE_ACCOUNT_JSON no está definida.');
     }
+
+    const credentials = JSON.parse(serviceAccountJson);
+
+    admin.initializeApp({
+      credential: admin.credential.cert(credentials),
+    });
+  } catch (error: any) {
+    // Proporcionar un mensaje de error más detallado
     throw new Error(
-      'No se pudo inicializar Firebase Admin. ' +
-      `Error original: ${error.message}`
+      `No se pudo inicializar Firebase Admin. Error original: ${error.message}. Asegúrate de que FIREBASE_SERVICE_ACCOUNT_JSON esté correctamente configurada como un JSON válido.`
     );
   }
 }
