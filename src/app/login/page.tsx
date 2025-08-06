@@ -50,9 +50,7 @@ export default function LoginPage() {
 
       toast({ title: '¡Éxito!', description: 'Has iniciado sesión correctamente.' });
       
-      // Let the root page or middleware handle redirection based on auth state.
-      // This prevents race conditions.
-      router.push('/'); // Navigate to a neutral page to trigger re-evaluation.
+      router.push('/dashboard');
 
     } catch (error: any) {
       let errorMessage = 'No se pudo iniciar sesión. Por favor, revisa tus credenciales.';
