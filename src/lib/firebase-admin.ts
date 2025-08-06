@@ -14,36 +14,20 @@ function initializeFirebaseAdmin() {
     return;
   }
 
-  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-
-  if (!serviceAccountJson) {
-    throw new Error(
-      'La variable de entorno FIREBASE_SERVICE_ACCOUNT_JSON no está definida. ' +
-      'Por favor, copia el contenido completo de tu archivo JSON de cuenta de servicio en esta variable.'
-    );
-  }
-
-  let serviceAccount;
   try {
-    serviceAccount = JSON.parse(serviceAccountJson);
-  } catch (error) {
-    console.error('Error al parsear FIREBASE_SERVICE_ACCOUNT_JSON:', error);
-    throw new Error(
-        'El valor de FIREBASE_SERVICE_ACCOUNT_JSON no es un JSON válido. ' +
-        'Asegúrate de copiar el contenido exacto del archivo de credenciales, incluyendo las llaves de apertura y cierre {}.'
-    );
-  }
-
-  try {
-    app = admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-    });
+    // El SDK buscará automáticamente las credenciales en la variable de entorno
+    // GOOGLE_APPLICATION_CREDENTIALS, que apunta al archivo service-account.json.
+    // Este es el método más robusto y recomendado para entornos de servidor.
+    app = admin.initializeApp();
   } catch (error: any) {
     console.error('Error al inicializar Firebase Admin SDK:', error.message);
-    throw new Error(
-      'No se pudo inicializar Firebase Admin. Verifica que el contenido de FIREBASE_SERVICE_ACCOUNT_JSON sea correcto. ' +
-      `Error original: ${error.message}`
-    );
+    if (error.message.includes('credential')) {
+       throw new Error(
+        'No se pudieron cargar las credenciales de Firebase. Asegúrate de que el archivo service-account.json en la raíz del proyecto es correcto y que la variable de entorno GOOGLE_APPLICATION_CREDENTIALS está configurada.' +
+        ` Error original: ${error.message}`
+      );
+    }
+    throw error;
   }
 }
 
