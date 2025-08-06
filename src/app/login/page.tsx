@@ -1,75 +1,132 @@
 
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { useState, FormEvent, useEffect } from 'react';
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Eye, EyeOff, Loader2, User as UserIcon } from "lucide-react";
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, ArrowRight, Eye, EyeOff } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { getFirestore, collection, query, where, getDocs } from 'firebase/firestore';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '@/lib/firebase'; // Import auth from the centralized config file
+import { auth, firestore } from '@/lib/firebase';
+import { login, getCurrentUser } from '@/lib/auth-client';
+import type { AppUser } from '@/lib/types';
 
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const router = useRouter();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  const router = useRouter();
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-
-    if (!auth.app) {
-       toast({
-        variant: 'destructive',
-        title: 'Error de Configuración',
-        description: 'La configuración de Firebase no se ha cargado. Revisa el archivo src/lib/firebase-config.ts',
-      });
-      setIsLoading(false);
-      return;
+  useEffect(() => {
+    // Si el usuario ya ha iniciado sesión, redirigir al dashboard
+    if (getCurrentUser()) {
+      router.replace('/dashboard');
     }
+  }, [router]);
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
 
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      
-      const token = await userCredential.user.getIdToken();
-      document.cookie = `firebaseIdToken=${token}; path=/; max-age=3600`;
+        // 1. Verificar si es Superusuario en 'users' con role 'superuser'
+        const superuserQuery = query(collection(firestore, "users"), where("email", "==", username.toLowerCase()), where("role", "==", "superuser"));
+        const superuserSnapshot = await getDocs(superuserQuery);
+        
+        // Asumimos que el email del superusuario también puede ser su "username" para el login.
+        if (!superuserSnapshot.empty) {
+            try {
+                 // Intentar iniciar sesión con Firebase Auth directamente
+                await signInWithEmailAndPassword(auth, username, password);
+                const userDoc = superuserSnapshot.docs[0];
+                const userData = userDoc.data() as AppUser;
 
-      toast({ title: '¡Éxito!', description: 'Has iniciado sesión correctamente.' });
-      
-      router.push('/dashboard');
+                login({
+                    uid: userDoc.id,
+                    email: userData.email,
+                    role: 'superuser',
+                    businessId: userData.businessId
+                });
+
+                toast({ title: `¡Bienvenido, Superusuario!`});
+                router.push('/dashboard');
+                return;
+            } catch (authError) {
+                 // Si falla, el password es incorrecto. Cae al error general.
+                 throw new Error("Credenciales de superusuario incorrectas.");
+            }
+        }
+        
+        // 2. Si no es superusuario, buscar usuario regular por email en la colección 'users'
+        const userQuery = query(collection(firestore, "users"), where("email", "==", username.toLowerCase()));
+        const userSnapshot = await getDocs(userQuery);
+
+        if (userSnapshot.empty) {
+            throw new Error("Credenciales inválidas.");
+        }
+
+        const userDoc = userSnapshot.docs[0];
+        const userData = userDoc.data() as AppUser;
+        const userEmail = userData.email;
+
+        if (!userEmail) {
+            throw new Error("El usuario no tiene un correo electrónico configurado para iniciar sesión.");
+        }
+
+        // Usar Firebase Auth para iniciar sesión
+        const userCredential = await signInWithEmailAndPassword(auth, userEmail, password);
+        const firebaseUser = userCredential.user;
+
+        // Si el inicio de sesión es exitoso, crear sesión local
+        login({
+            uid: firebaseUser.uid,
+            email: userData.email,
+            role: userData.role,
+            businessId: userData.businessId
+        });
+
+        toast({ title: `¡Bienvenido!`});
+        router.push('/dashboard');
 
     } catch (error: any) {
-      let errorMessage = 'No se pudo iniciar sesión. Por favor, revisa tus credenciales.';
-       if (error.code) {
-         if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
-             errorMessage = 'Correo electrónico o contraseña incorrectos.';
-         } else if (error.code === 'auth/invalid-api-key' || error.code === 'auth/project-not-found' || error.code === 'auth/api-key-not-valid') {
-             errorMessage = `Error de Configuración: ${error.code}. Revisa que los valores en src/lib/firebase-config.ts sean correctos.`;
-         } else {
-             errorMessage = `Error: ${error.code}. Revisa tus credenciales o la configuración del proyecto.`;
-         }
-       }
-      toast({
-        variant: 'destructive',
-        title: 'Error de autenticación',
-        description: errorMessage,
-      });
+        console.error("Error de inicio de sesión: ", error);
+        let errorMessage = "Credenciales inválidas. Por favor, inténtalo de nuevo.";
+        if (error.code) {
+          if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+             errorMessage = "Usuario o contraseña incorrectos.";
+          }
+        } else if (error.message) {
+           errorMessage = error.message;
+        }
+
+        toast({
+            variant: "destructive",
+            title: "Error de Inicio de Sesión",
+            description: errorMessage,
+        });
     } finally {
-        setIsLoading(false);
+        setIsSubmitting(false);
     }
   };
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
       <div className="w-full max-w-md">
-        <form onSubmit={handleLogin}>
+        <form onSubmit={handleSubmit}>
           <Card className="shadow-2xl">
             <CardHeader className="text-center">
               <CardTitle className="text-3xl font-bold text-primary">Sorteo Xpress</CardTitle>
@@ -77,15 +134,15 @@ export default function LoginPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Correo Electrónico</Label>
+                <Label htmlFor="username">Usuario (Email)</Label>
                 <Input
-                  id="email"
+                  id="username"
                   type="email"
                   placeholder="tu@email.com"
                   required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  disabled={isLoading}
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  disabled={isSubmitting}
                 />
               </div>
               <div className="space-y-2">
@@ -98,7 +155,7 @@ export default function LoginPage() {
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    disabled={isLoading}
+                    disabled={isSubmitting}
                     />
                     <Button
                         type="button"
@@ -114,9 +171,9 @@ export default function LoginPage() {
               </div>
             </CardContent>
             <CardFooter>
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? <Loader2 className="animate-spin" /> : <ArrowRight className="mr-2" />}
-                Iniciar Sesión
+              <Button type="submit" className="w-full" disabled={isSubmitting}>
+                {isSubmitting ? <Loader2 className="animate-spin" /> : <UserIcon className="mr-2" />}
+                {isSubmitting ? 'Verificando...' : 'Iniciar Sesión'}
               </Button>
             </CardFooter>
           </Card>

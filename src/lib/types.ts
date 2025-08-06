@@ -1,3 +1,4 @@
+
 export interface Ticket {
   number: number;
   name?: string | null;
@@ -39,4 +40,11 @@ export interface Business {
     address: string;
     location?: Location;
     createdAt: any; // Firestore Timestamp
+}
+
+export interface AppUser {
+  uid: string;
+  email: string | null;
+  role: 'superuser' | 'admin' | 'seller' | 'unknown';
+  businessId?: string;
 }

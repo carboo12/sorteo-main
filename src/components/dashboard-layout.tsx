@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useEffect } from 'react';
@@ -19,17 +18,14 @@ import {
 import { Button } from '@/components/ui/button';
 import { Home, Ticket, Users, LogOut, Building } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
-import { signOutUser } from '@/lib/auth-client';
 import { Loader2 } from 'lucide-react';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading, signOut } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
-    // This effect handles redirection logic.
-    // The middleware should prevent unauthenticated access, but this is a fallback.
     if (!loading && !user) {
       router.replace('/login');
     }
@@ -37,7 +33,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
 
   const handleSignOut = async () => {
-    await signOutUser();
+    signOut();
     router.push('/login');
   };
 
