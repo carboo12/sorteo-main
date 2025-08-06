@@ -208,7 +208,7 @@ export async function getWinnerHistory(businessId: string): Promise<Winner[]> {
       }
     });
 
-    winners.sort((a, b) => b.drawnAt.getTime() - a.b.getTime());
+    winners.sort((a, b) => b.drawnAt.getTime() - a.drawnAt.getTime());
 
     return winners.map((winner) => ({
       ...winner,
