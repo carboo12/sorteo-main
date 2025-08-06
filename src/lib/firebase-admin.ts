@@ -13,7 +13,7 @@ function initializeFirebaseAdmin() {
   const serviceAccountParams = {
       projectId: serviceAccount.project_id,
       clientEmail: serviceAccount.client_email,
-      privateKey: serviceAccount.private_key,
+      privateKey: serviceAccount.private_key.replace(/\\n/g, '\n'),
   }
 
   if (!serviceAccountParams.projectId || !serviceAccountParams.clientEmail || !serviceAccountParams.privateKey) {
