@@ -5,24 +5,23 @@ import serviceAccount from '../../service-account.json';
 // Esta función asegura que Firebase Admin se inicialice solo una vez.
 function initializeFirebaseAdmin() {
   if (admin.apps.length > 0) {
-    return;
+    return admin.app();
   }
 
   // Verificar si las credenciales son las de marcador de posición
   if (serviceAccount.project_id === 'DEPRECATED - Reemplaza este archivo con tus credenciales') {
-    const errorMessage = 'El archivo service-account.json contiene credenciales de marcador de posición. Por favor, reemplaza el contenido de service-account.json con tus credenciales reales de Firebase.';
-    // No lanzamos un error para evitar que la app crashee, solo lo mostramos en consola.
-    // La app fallará de todas formas en la inicialización, pero con un error de Firebase más claro.
-    console.error(errorMessage);
+    // Solo mostramos una advertencia en la consola, pero no lanzamos un error que detenga la app.
+    // La inicialización de Firebase fallará por sí misma con un error más claro si las credenciales son inválidas.
+    console.warn('ADVERTENCIA: El archivo service-account.json parece contener credenciales de marcador de posición. Por favor, asegúrate de reemplazarlo con tus credenciales reales de Firebase para que la aplicación funcione correctamente.');
   }
 
   try {
-    admin.initializeApp({
+    return admin.initializeApp({
       credential: admin.credential.cert(serviceAccount as admin.ServiceAccount),
     });
   } catch (error: any) {
     console.error('Error al inicializar Firebase Admin SDK:', error.message);
-    // Re-lanzamos el error original de Firebase para que sea más claro
+    // Re-lanzamos el error original de Firebase para que sea más claro en los logs de Next.js
     throw new Error(
       'No se pudo inicializar Firebase Admin. Verifica que el archivo service-account.json sea correcto y no esté corrupto. ' +
       `Error original: ${error.message}`
