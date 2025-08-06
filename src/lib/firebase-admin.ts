@@ -26,16 +26,22 @@ function initializeFirebaseAdmin() {
     // Parseamos el JSON desde la variable de entorno.
     const serviceAccount = JSON.parse(serviceAccountJson) as ServiceAccount;
 
-    // Inicializamos la app de Admin con las credenciales parseadas.
+    // *** CORRECCIÓN CRÍTICA ***
+    // El error 'Invalid PEM formatted message' ocurre cuando los saltos de línea
+    // en la clave privada están escapados como '\\n' en lugar de '\n'.
+    // Esta línea reemplaza explícitamente la versión escapada por la correcta.
+    serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+
+    // Inicializamos la app de Admin con las credenciales parseadas y corregidas.
     return admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
     });
   } catch (error: any) {
-    // Este bloque se ejecuta si el JSON es inválido o si la inicialización falla (ej. clave privada malformada)
+    // Este bloque se ejecuta si el JSON es inválido o si la inicialización falla
     console.error('Error al parsear FIREBASE_SERVICE_ACCOUNT_JSON o al inicializar Firebase Admin:', error.message);
     throw new Error(
       `No se pudo inicializar Firebase Admin. La causa más común es un error de formato en la variable de entorno FIREBASE_SERVICE_ACCOUNT_JSON. ` +
-      `Asegúrate de que el valor sea un JSON válido y que los saltos de línea en la private_key ('\\n') estén correctamente escapados. ` +
+      `Asegúrate de que el valor sea un JSON válido. ` +
       `Error original: ${error.message}`
     );
   }
