@@ -49,7 +49,9 @@ export default function LoginPage() {
       }
 
       toast({ title: '¡Éxito!', description: 'Has iniciado sesión correctamente.' });
-      router.replace('/dashboard');
+      
+      // Force navigation to ensure middleware picks up the change.
+      window.location.href = '/dashboard';
 
     } catch (error: any) {
       let errorMessage = 'No se pudo iniciar sesión. Por favor, revisa tus credenciales.';
@@ -68,7 +70,8 @@ export default function LoginPage() {
         description: errorMessage,
       });
     } finally {
-      setIsLoading(false);
+      // Keep loading true to prevent user interaction while redirecting
+      // setIsLoading(false);
     }
   };
 
