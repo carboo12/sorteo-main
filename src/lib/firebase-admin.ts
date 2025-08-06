@@ -6,9 +6,6 @@ let app: admin.app.App;
 
 function initializeFirebaseAdmin() {
   if (admin.apps.length > 0) {
-    if (!app) {
-      app = admin.app();
-    }
     return;
   }
 
