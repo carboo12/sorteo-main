@@ -7,6 +7,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, firestore } from '@/lib/firebase';
 import { getCurrentUser, login as localLogin, signOutUser as localSignOut } from '@/lib/auth-client';
 import type { AppUser } from '@/lib/types';
+import { getFirebaseApp } from '@/lib/firebase'; // Import the new function
 
 const SUPERUSER_EMAIL = 'carboo12@gmail.com';
 
@@ -23,6 +24,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   const syncUser = useCallback(async (firebaseUser: FirebaseUser | null) => {
+    // Ensure Firebase is initialized before proceeding
+    getFirebaseApp();
+
     if (firebaseUser) {
         const token = await firebaseUser.getIdToken();
         document.cookie = `firebaseIdToken=${token}; path=/; max-age=3600`;
