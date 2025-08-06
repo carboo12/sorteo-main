@@ -29,7 +29,6 @@ export async function signInWithUsername(username: string, password: string): Pr
     try {
         const usersRef = adminFirestore.collection("users");
         // Firestore Admin SDK queries are case-sensitive. We query by lowercase username.
-        // The field in the database is `nombre`.
         const userQuery = usersRef.where("nombre", "==", username.toLowerCase());
         const userSnapshot = await userQuery.get();
 
@@ -47,20 +46,13 @@ export async function signInWithUsername(username: string, password: string): Pr
             return { success: false, message: "La cuenta de usuario está mal configurada. Contacta con el administrador." };
         }
         
-        // This part needs to run on the client to set the auth state.
-        // The server action can't directly sign the user in on the client.
-        // So, we return the user data and let the client complete the sign-in.
-        // This is a limitation of trying to mix server-side validation with client-side auth state.
-        // A better approach would be custom tokens, but for now, we pass the email back.
-        // Let's re-think. The server can't sign in the user in the client's browser.
-        // The client must call signInWithEmailAndPassword.
-        // This means the original approach of getting the email on the client is necessary,
-        // which implies the Firestore rules must be permissive.
-        // The user's problem is that the query returns empty. This has to be a rules issue.
+        // This is a workaround to validate the password using the client SDK.
+        // It's not ideal, but it's the only way without a custom token system or more complex setup.
+        // We are essentially using the server to find the email, then passing it back to the client.
+        // However, we cannot call client-side Firebase Auth from a server action.
+        // The responsibility must lie with the client to complete the sign in.
         
-        // Let's try to validate the password on the server. This is not possible with the client SDK's password.
-        // The best we can do is check if the user exists and return the email.
-        
+        // Let's pass the full user object back to the client so it can complete the sign-in.
         return { success: true, message: "Usuario encontrado.", user: userData };
 
     } catch (error: any) {
