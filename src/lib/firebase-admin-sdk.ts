@@ -18,7 +18,7 @@ function initializeFirebaseAdmin() {
   const serviceAccount = serviceAccountCredentials as ServiceAccount;
 
   // Verificación crucial para evitar el uso de credenciales de ejemplo.
-  if (!serviceAccount.project_id || serviceAccount.project_id === 'DEPRECATED - Reemplaza este archivo con tus credenciales') {
+  if (!serviceAccount.project_id || serviceAccount.project_id.startsWith('DEPRECATED')) {
     console.warn('El archivo service-account.json contiene credenciales de marcador de posición. El SDK de Admin no se inicializará.');
     return null;
   }
