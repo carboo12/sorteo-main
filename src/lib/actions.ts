@@ -29,7 +29,8 @@ export async function signInWithUsername(username: string, password: string): Pr
     try {
         const usersRef = adminFirestore.collection("users");
         // Firestore Admin SDK queries are case-sensitive. We query by lowercase username.
-        const userQuery = usersRef.where("username", "==", username.toLowerCase());
+        // The field in the database is `nombre`.
+        const userQuery = usersRef.where("nombre", "==", username.toLowerCase());
         const userSnapshot = await userQuery.get();
 
         if (userSnapshot.empty) {
@@ -55,7 +56,6 @@ export async function signInWithUsername(username: string, password: string): Pr
         // The client must call signInWithEmailAndPassword.
         // This means the original approach of getting the email on the client is necessary,
         // which implies the Firestore rules must be permissive.
-        // Let's go back to the client-side logic but ensure the permissions are explained.
         // The user's problem is that the query returns empty. This has to be a rules issue.
         
         // Let's try to validate the password on the server. This is not possible with the client SDK's password.
@@ -343,7 +343,8 @@ export async function getOrCreateUser(uid: string, email: string | null): Promis
                 role,
                 // businessId is not set on creation
             };
-            await userDocRef.set({ ...newUser, createdAt: AdminTimestamp.now() });
+            // The field for username is `nombre`
+            await userDocRef.set({ ...newUser, nombre: username, createdAt: AdminTimestamp.now() });
             
             // Also update the custom claims in Firebase Auth if it's a superuser
             if (isSuperuser) {
