@@ -1,5 +1,6 @@
 
 import * as admin from 'firebase-admin';
+import serviceAccount from '../../service-account.json';
 
 // Esta función asegura que Firebase Admin se inicialice solo una vez.
 function initializeFirebaseAdmin() {
@@ -8,33 +9,27 @@ function initializeFirebaseAdmin() {
     return;
   }
 
-  // Obtenemos las credenciales desde las variables de entorno.
-  const projectId = process.env.FIREBASE_PROJECT_ID;
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  // La clave privada a menudo causa problemas de formato. La corregimos aquí.
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
-
-  // Verificamos que todas las variables necesarias estén presentes.
-  if (!projectId || !clientEmail || !privateKey) {
+  // Verifica que las propiedades necesarias existan en el service account
+  if (
+    !serviceAccount.project_id ||
+    !serviceAccount.client_email ||
+    !serviceAccount.private_key
+  ) {
     throw new Error(
-      'Faltan las variables de entorno de Firebase (FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY). ' +
-      'Asegúrate de que estén configuradas correctamente.'
+      'El archivo service-account.json está incompleto o es inválido. ' +
+      'Asegúrate de que contenga project_id, client_email y private_key.'
     );
   }
 
   try {
-    // Inicializamos el SDK de Admin con las credenciales ya corregidas.
+    // Inicializamos el SDK de Admin con las credenciales del archivo importado.
     admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId,
-        clientEmail,
-        privateKey,
-      }),
+      credential: admin.credential.cert(serviceAccount as admin.ServiceAccount),
     });
   } catch (error: any) {
     console.error('Error al inicializar Firebase Admin SDK:', error.message);
     throw new Error(
-      'No se pudo inicializar Firebase Admin. Verifica que las variables de entorno sean correctas. ' +
+      'No se pudo inicializar Firebase Admin. Verifica que el archivo service-account.json sea correcto. ' +
       `Error original: ${error.message}`
     );
   }
