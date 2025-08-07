@@ -58,11 +58,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Sync across tabs for logout/login events.
     const handleStorageChange = () => {
         const updatedUser = getCurrentUser();
-        setUser(updatedUser);
         // If the user logs out from another tab, firebase onAuthStateChanged will also fire.
         // This handles logging in as superuser in another tab.
-        if (updatedUser?.role === 'superuser') {
+        if (updatedUser?.role === 'superuser' && user?.uid !== updatedUser.uid) {
             window.location.reload(); // Reload to re-evaluate the auth logic.
+        } else if (!updatedUser) {
+             setUser(null);
         }
     };
     window.addEventListener('storage', handleStorageChange);
