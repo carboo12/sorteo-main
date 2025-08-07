@@ -41,7 +41,7 @@ export default function LoginPage() {
     setIsSubmitting(true);
     try {
         // --- SUPERUSER AUTHENTICATION LOGIC ---
-        // This logic is completely separate and runs first.
+        // This logic is completely separate and does NOT use Firebase Auth for password check.
         if (values.username.toLowerCase() === 'admin') {
             const masterQuery = query(collection(db, "masterusers"), where("nombre", "==", values.username.toLowerCase()));
             const masterSnapshot = await getDocs(masterQuery);
