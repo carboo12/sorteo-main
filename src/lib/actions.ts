@@ -1,13 +1,14 @@
 'use server';
 
-import { adminFirestore, isAdminReady } from './firebase-admin-sdk';
+import './firebase-admin-sdk'; // Ensure admin app is initialized
+import { adminFirestore } from './firebase-admin-sdk';
 import type { AppUser, Business, Ticket, TurnoData, TurnoInfo, Winner } from './types';
 import { selectWinningNumber } from '@/ai/flows/select-winning-number';
 import * as admin from 'firebase-admin';
 
 // Helper function to find a user in a specific collection by username
 async function findUserInCollection(collectionName: string, username: string): Promise<any | null> {
-    const snapshot = await adminFirestore!
+    const snapshot = await adminFirestore
         .collection(collectionName)
         .where('nombre', '==', username)
         .limit(1)
@@ -27,12 +28,6 @@ export async function signInWithUsername(username: string): Promise<{
   message: string;
   user?: { email: string; role: string, name: string, businessId?: string };
 }> {
-
-  const { ready, message } = isAdminReady();
-  if (!ready) {
-      return { success: false, message };
-  }
-
   try {
     const superuser = await findUserInCollection('masterusers', username);
     if (superuser && superuser.email) {
@@ -71,12 +66,7 @@ export async function signInWithUsername(username: string): Promise<{
 
 
 export async function getOrCreateUser(uid: string, email: string | null): Promise<AppUser | null> {
-    const { ready, message } = isAdminReady();
-    if (!ready) {
-        throw new Error(message);
-    }
-  
-    const userRef = adminFirestore!.collection('users').doc(uid);
+    const userRef = adminFirestore.collection('users').doc(uid);
     const userSnap = await userRef.get();
   
     if (userSnap.exists) {
@@ -87,7 +77,7 @@ export async function getOrCreateUser(uid: string, email: string | null): Promis
       return null;
     }
   
-    const superuserSnap = await adminFirestore!.collection('masterusers').where('email', '==', email).limit(1).get();
+    const superuserSnap = await adminFirestore.collection('masterusers').where('email', '==', email).limit(1).get();
     if (!superuserSnap.empty) {
         const superuserData = superuserSnap.docs[0].data();
         const appUser: AppUser = {
@@ -100,7 +90,7 @@ export async function getOrCreateUser(uid: string, email: string | null): Promis
         return appUser;
     }
 
-    const businessUserSnap = await adminFirestore!.collection('users').where('email', '==', email).limit(1).get();
+    const businessUserSnap = await adminFirestore.collection('users').where('email', '==', email).limit(1).get();
      if (!businessUserSnap.empty) {
         const businessUserData = businessUserSnap.docs[0].data();
         const appUser: AppUser = {
@@ -113,7 +103,7 @@ export async function getOrCreateUser(uid: string, email: string | null): Promis
         await userRef.set(appUser);
         
         if(businessUserSnap.docs[0].id !== uid) {
-            await adminFirestore!.collection('users').doc(businessUserSnap.docs[0].id).delete();
+            await adminFirestore.collection('users').doc(businessUserSnap.docs[0].id).delete();
         }
         
         return appUser;
@@ -124,13 +114,9 @@ export async function getOrCreateUser(uid: string, email: string | null): Promis
 
 
 export async function createBusiness(businessData: Omit<Business, 'id'>): Promise<{ success: boolean; message: string; businessId?: string }> {
-    const { ready, message } = isAdminReady();
-    if (!ready) {
-        return { success: false, message };
-    }
 
     try {
-        const businessRef = await adminFirestore!.collection('businesses').add(businessData);
+        const businessRef = await adminFirestore.collection('businesses').add(businessData);
         return { success: true, message: 'Negocio creado con éxito.', businessId: businessRef.id };
     } catch (error: any) {
         console.error("Error creating business:", error);
@@ -139,13 +125,8 @@ export async function createBusiness(businessData: Omit<Business, 'id'>): Promis
 }
 
 export async function getBusinesses(): Promise<Business[]> {
-    const { ready, message } = isAdminReady();
-    if (!ready) {
-        console.error(message);
-        return [];
-    }
     try {
-        const snapshot = await adminFirestore!.collection('businesses').get();
+        const snapshot = await adminFirestore.collection('businesses').get();
         if (snapshot.empty) {
             return [];
         }
@@ -158,10 +139,8 @@ export async function getBusinesses(): Promise<Business[]> {
 
 
 export async function getTurnoData(turnoInfo: TurnoInfo, businessId: string): Promise<TurnoData> {
-    const { ready, message } = isAdminReady();
-    if (!ready) throw new Error(message);
     const docId = `${businessId}_${turnoInfo.date}_${turnoInfo.turno}`;
-    const doc = await adminFirestore!.collection('turnos').doc(docId).get();
+    const doc = await adminFirestore.collection('turnos').doc(docId).get();
     if (doc.exists) {
         return doc.data() as TurnoData;
     }
@@ -174,14 +153,11 @@ export async function buyTicket(
   name: string | null,
   businessId: string
 ): Promise<{ success: boolean; message: string }> {
-    const { ready, message } = isAdminReady();
-    if (!ready) return { success: false, message };
-
     const docId = `${businessId}_${turnoInfo.date}_${turnoInfo.turno}`;
-    const docRef = adminFirestore!.collection('turnos').doc(docId);
+    const docRef = adminFirestore.collection('turnos').doc(docId);
 
     try {
-        await adminFirestore!.runTransaction(async (transaction) => {
+        await adminFirestore.runTransaction(async (transaction) => {
             const doc = await transaction.get(docRef);
             const data = doc.exists ? doc.data() as TurnoData : { tickets: [] };
             const tickets = data.tickets || [];
@@ -203,12 +179,9 @@ export async function buyTicket(
 }
 
 export async function drawWinner(turnoInfo: TurnoInfo, businessId: string): Promise<{ success: boolean; message: string; winningNumber?: number }> {
-  const { ready, message } = isAdminReady();
-  if (!ready) return { success: false, message };
-  
   const docId = `${businessId}_${turnoInfo.date}_${turnoInfo.turno}`;
-  const turnoRef = adminFirestore!.collection('turnos').doc(docId);
-  const businessRef = adminFirestore!.collection('businesses').doc(businessId);
+  const turnoRef = adminFirestore.collection('turnos').doc(docId);
+  const businessRef = adminFirestore.collection('businesses').doc(businessId);
   
   try {
     const { winningNumber } = await selectWinningNumber();
@@ -217,7 +190,7 @@ export async function drawWinner(turnoInfo: TurnoInfo, businessId: string): Prom
         throw new Error('No se pudo generar un número ganador.');
     }
 
-    await adminFirestore!.runTransaction(async (transaction) => {
+    await adminFirestore.runTransaction(async (transaction) => {
       const turnoDoc = await transaction.get(turnoRef);
       const businessDoc = await transaction.get(businessRef);
       
@@ -253,12 +226,7 @@ export async function drawWinner(turnoInfo: TurnoInfo, businessId: string): Prom
 }
 
 export async function getWinnerHistory(businessId: string): Promise<Winner[]> {
-  const { ready, message } = isAdminReady();
-  if (!ready) {
-      console.error(message);
-      return [];
-  }
-  const businessDoc = await adminFirestore!.collection('businesses').doc(businessId).get();
+  const businessDoc = await adminFirestore.collection('businesses').doc(businessId).get();
   if (businessDoc.exists) {
     const data = businessDoc.data();
     return (data?.winnerHistory || []).sort((a: Winner, b: Winner) => new Date(b.drawnAt).getTime() - new Date(a.drawnAt).getTime());
