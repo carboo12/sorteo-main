@@ -1,7 +1,6 @@
 
 'use server';
 
-import './firebase-admin-sdk'; // <-- Ensure Admin SDK is initialized
 import { adminFirestore, adminAuth } from './firebase-admin-sdk';
 import type { AppUser, Business, Ticket, TurnoData, TurnoInfo, Winner, UserFormData } from './types';
 import { selectWinningNumber } from '@/ai/flows/select-winning-number';
@@ -9,6 +8,7 @@ import * as admin from 'firebase-admin';
 
 export async function logError(context: string, error: any): Promise<void> {
     try {
+        await import('./firebase-admin-sdk');
         const errorData: any = {
             context: context,
             timestamp: admin.firestore.FieldValue.serverTimestamp(),
@@ -34,6 +34,7 @@ export async function logError(context: string, error: any): Promise<void> {
 
 
 export async function getOrCreateUser(uid: string, email: string | null): Promise<AppUser | null> {
+    await import('./firebase-admin-sdk');
     const userRef = adminFirestore.collection('users').doc(uid);
     const userSnap = await userRef.get();
   
@@ -89,7 +90,7 @@ export async function getOrCreateUser(uid: string, email: string | null): Promis
 
 
 export async function createBusiness(businessData: Omit<Business, 'id'>): Promise<{ success: boolean; message: string; businessId?: string }> {
-
+    await import('./firebase-admin-sdk');
     try {
         const businessRef = await adminFirestore.collection('businesses').add(businessData);
         return { success: true, message: 'Negocio creado con éxito.', businessId: businessRef.id };
@@ -100,6 +101,7 @@ export async function createBusiness(businessData: Omit<Business, 'id'>): Promis
 }
 
 export async function updateBusiness(id: string, businessData: Omit<Business, 'id'>): Promise<{ success: boolean; message: string }> {
+    await import('./firebase-admin-sdk');
     try {
         await adminFirestore.collection('businesses').doc(id).update(businessData);
         return { success: true, message: 'Negocio actualizado con éxito.' };
@@ -110,6 +112,7 @@ export async function updateBusiness(id: string, businessData: Omit<Business, 'i
 }
 
 export async function getBusinesses(): Promise<Business[]> {
+    await import('./firebase-admin-sdk');
     try {
         const snapshot = await adminFirestore.collection('businesses').get();
         if (snapshot.empty) {
@@ -123,6 +126,7 @@ export async function getBusinesses(): Promise<Business[]> {
 }
 
 export async function getBusinessById(id: string): Promise<Business | null> {
+    await import('./firebase-admin-sdk');
     try {
         const doc = await adminFirestore.collection('businesses').doc(id).get();
         if (!doc.exists) {
@@ -136,6 +140,7 @@ export async function getBusinessById(id: string): Promise<Business | null> {
 }
 
 export async function getUsers(): Promise<AppUser[]> {
+    await import('./firebase-admin-sdk');
     try {
         const snapshot = await adminFirestore.collection('users').get();
         if (snapshot.empty) {
@@ -150,6 +155,7 @@ export async function getUsers(): Promise<AppUser[]> {
 
 
 export async function createUser(userData: UserFormData): Promise<{ success: boolean; message: string; }> {
+    await import('./firebase-admin-sdk');
     try {
         // 1. Create user in Firebase Auth
         const userRecord = await adminAuth.createUser({
@@ -185,6 +191,7 @@ export async function createUser(userData: UserFormData): Promise<{ success: boo
 }
 
 export async function toggleUserStatus(uid: string, disabled: boolean): Promise<{ success: boolean, message: string }> {
+    await import('./firebase-admin-sdk');
     try {
         // Update Firebase Auth state
         await adminAuth.updateUser(uid, { disabled });
@@ -204,6 +211,7 @@ export async function toggleUserStatus(uid: string, disabled: boolean): Promise<
 
 
 export async function getTurnoData(turnoInfo: TurnoInfo, businessId: string): Promise<TurnoData> {
+    await import('./firebase-admin-sdk');
     const docId = `${businessId}_${turnoInfo.date}_${turnoInfo.turno}`;
     const doc = await adminFirestore.collection('turnos').doc(docId).get();
     if (doc.exists) {
@@ -218,6 +226,7 @@ export async function buyTicket(
   name: string | null,
   businessId: string
 ): Promise<{ success: boolean; message: string }> {
+    await import('./firebase-admin-sdk');
     const docId = `${businessId}_${turnoInfo.date}_${turnoInfo.turno}`;
     const docRef = adminFirestore.collection('turnos').doc(docId);
 
@@ -244,6 +253,7 @@ export async function buyTicket(
 }
 
 export async function drawWinner(turnoInfo: TurnoInfo, businessId: string): Promise<{ success: boolean; message: string; winningNumber?: number }> {
+  await import('./firebase-admin-sdk');
   const docId = `${businessId}_${turnoInfo.date}_${turnoInfo.turno}`;
   const turnoRef = adminFirestore.collection('turnos').doc(docId);
   const businessRef = adminFirestore.collection('businesses').doc(businessId);
@@ -291,6 +301,7 @@ export async function drawWinner(turnoInfo: TurnoInfo, businessId: string): Prom
 }
 
 export async function getWinnerHistory(businessId: string): Promise<Winner[]> {
+  await import('./firebase-admin-sdk');
   const businessDoc = await adminFirestore.collection('businesses').doc(businessId).get();
   if (businessDoc.exists) {
     const data = businessDoc.data();
