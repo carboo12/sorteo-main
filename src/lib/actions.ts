@@ -1,4 +1,3 @@
-
 'use server';
 
 import { adminFirestore, isAdminReady } from './firebase-admin-sdk';
@@ -8,7 +7,6 @@ import * as admin from 'firebase-admin';
 
 // Helper function to find a user in a specific collection by username
 async function findUserInCollection(collectionName: string, username: string): Promise<any | null> {
-    // No longer normalizing username to lowercase. Search will be case-sensitive.
     const snapshot = await adminFirestore!
         .collection(collectionName)
         .where('nombre', '==', username)
@@ -36,7 +34,6 @@ export async function signInWithUsername(username: string): Promise<{
   }
 
   try {
-    // This assumes superusers are in 'masterusers' and regular users in 'users'
     const superuser = await findUserInCollection('masterusers', username);
     if (superuser && superuser.email) {
       return {
@@ -87,11 +84,9 @@ export async function getOrCreateUser(uid: string, email: string | null): Promis
     }
   
     if (!email) {
-      // Cannot create a user record without an email.
       return null;
     }
   
-    // Check if the user is pre-registered as a superuser
     const superuserSnap = await adminFirestore!.collection('masterusers').where('email', '==', email).limit(1).get();
     if (!superuserSnap.empty) {
         const superuserData = superuserSnap.docs[0].data();
@@ -105,7 +100,6 @@ export async function getOrCreateUser(uid: string, email: string | null): Promis
         return appUser;
     }
 
-    // Check if the user is pre-registered as a business user
     const businessUserSnap = await adminFirestore!.collection('users').where('email', '==', email).limit(1).get();
      if (!businessUserSnap.empty) {
         const businessUserData = businessUserSnap.docs[0].data();
@@ -116,11 +110,8 @@ export async function getOrCreateUser(uid: string, email: string | null): Promis
             role: businessUserData.role || 'seller',
             businessId: businessUserData.businessId || null,
         };
-        // Create the new user record with the UID from Auth
         await userRef.set(appUser);
-
-        // IMPORTANT: Delete the old, pre-registered record that didn't have the UID as the document ID
-        // This is to prevent duplicate user entries.
+        
         if(businessUserSnap.docs[0].id !== uid) {
             await adminFirestore!.collection('users').doc(businessUserSnap.docs[0].id).delete();
         }
@@ -128,7 +119,6 @@ export async function getOrCreateUser(uid: string, email: string | null): Promis
         return appUser;
     }
 
-    // If user is not pre-registered in any collection
     throw new Error('El usuario no está pre-registrado. Contacta al administrador.');
 }
 
@@ -271,7 +261,6 @@ export async function getWinnerHistory(businessId: string): Promise<Winner[]> {
   const businessDoc = await adminFirestore!.collection('businesses').doc(businessId).get();
   if (businessDoc.exists) {
     const data = businessDoc.data();
-    // Sort by drawnAt descending
     return (data?.winnerHistory || []).sort((a: Winner, b: Winner) => new Date(b.drawnAt).getTime() - new Date(a.drawnAt).getTime());
   }
   return [];
