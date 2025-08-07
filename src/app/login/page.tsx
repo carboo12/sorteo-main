@@ -41,7 +41,7 @@ export default function LoginPage() {
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
     try {
-        // --- SUPERUSER HARDCODED CHECK (PRIORITY #1) ---
+        // --- 1. SUPERUSER HARDCODED CHECK (HIGHEST PRIORITY) ---
         if (values.username.toLowerCase() === 'admin' && values.password === '123456') {
             const superUser: AppUser = {
                 uid: 'superuser_local_id',
@@ -50,14 +50,13 @@ export default function LoginPage() {
                 role: 'superuser',
                 businessId: null,
             };
-            login(superUser); // This saves to localStorage
+            login(superUser);
             toast({ title: '¡Éxito!', description: 'Has iniciado sesión como superusuario.' });
             router.push('/dashboard');
-            return; // Stop execution here
+            return;
         }
 
-        // --- NORMAL USER AUTHENTICATION (FALLBACK) ---
-        // First, check masterusers collection as well
+        // --- 2. MASTERUSER DB CHECK (SECOND PRIORITY) ---
         const masterUserQuery = query(collection(db, "masterusers"), where("nombre", "==", values.username));
         const masterUserSnapshot = await getDocs(masterUserQuery);
 
@@ -75,10 +74,13 @@ export default function LoginPage() {
                 toast({ title: '¡Éxito!', description: 'Has iniciado sesión como superusuario.' });
                 router.push('/dashboard');
                 return;
+            } else {
+                // Password for masteruser is incorrect, throw error and stop.
+                 throw new Error("Usuario o contraseña incorrectos.");
             }
         }
 
-
+        // --- 3. NORMAL USER AUTHENTICATION (FALLBACK) ---
         const userQuery = query(collection(db, "users"), where("name", "==", values.username));
         const userSnapshot = await getDocs(userQuery);
 
@@ -92,7 +94,6 @@ export default function LoginPage() {
              throw new Error("El usuario no tiene un email asociado.");
         }
         
-        // Use Firebase Auth for normal users
         await signInWithEmailAndPassword(auth, userEmail, values.password);
       
         toast({ title: '¡Éxito!', description: 'Has iniciado sesión correctamente.' });
