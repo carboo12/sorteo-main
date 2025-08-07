@@ -1,7 +1,8 @@
+
 'use server';
 
-import './firebase-admin-sdk'; // Ensure admin app is initialized
-import { adminFirestore } from './firebase-admin-sdk';
+import './firebase-admin-sdk'; // <-- Ensure Admin SDK is initialized
+import { adminFirestore, adminAuth } from './firebase-admin-sdk';
 import type { AppUser, Business, Ticket, TurnoData, TurnoInfo, Winner } from './types';
 import { selectWinningNumber } from '@/ai/flows/select-winning-number';
 import * as admin from 'firebase-admin';

@@ -15,21 +15,11 @@ if (!admin.apps.length) {
       credential: admin.credential.cert(serviceAccount)
     });
   } catch (error: any) {
-    console.error('Firebase Admin SDK Initialization Error:', error.stack);
+    console.error('Error de inicialización de Firebase Admin SDK:', error);
   }
 }
 
 const adminFirestore = admin.firestore();
 const adminAuth = admin.auth();
 
-const isAdminReady = () => {
-    if (!admin.apps.length) {
-        return {
-            ready: false,
-            message: 'El SDK de Admin no se pudo inicializar. Revisa las credenciales en el servidor.'
-        };
-    }
-    return { ready: true, message: 'SDK de Admin listo.' };
-}
-
-export { admin, adminFirestore, adminAuth, isAdminReady };
+export { admin, adminFirestore, adminAuth };

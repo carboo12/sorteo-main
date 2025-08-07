@@ -3,7 +3,7 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { auth, getFirebaseApp } from '@/lib/firebase';
+import { auth } from '@/lib/firebase';
 import { getCurrentUser, login as localLogin, signOutUser as localSignOut } from '@/lib/auth-client';
 import { getOrCreateUser } from '@/lib/actions';
 import type { AppUser } from '@/lib/types';
@@ -21,9 +21,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   const handleAuthStateChange = useCallback(async (firebaseUser: FirebaseUser | null) => {
-    // Ensure Firebase client app is initialized before doing anything
-    getFirebaseApp();
-    
     if (firebaseUser) {
       // User is signed in with Firebase.
       // Now, get or create their profile from our backend (Firestore) using a server action.
