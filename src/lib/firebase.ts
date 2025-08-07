@@ -6,13 +6,14 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig: FirebaseOptions = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  apiKey: "AIzaSyDjebs_A0o3ULi4JzfW0_PMc4u7vx2ClZ0",
+  authDomain: "sorteo-xpress.firebaseapp.com",
+  projectId: "sorteo-xpress",
+  storageBucket: "sorteo-xpress.appspot.com",
+  messagingSenderId: "350907987718",
+  appId: "1:350907987718:web:2000b622e02b5544945087"
 };
+
 
 // Initialize Firebase
 function getFirebaseApp() {
