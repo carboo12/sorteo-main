@@ -40,7 +40,7 @@ export interface Location {
 }
 
 export interface Business {
-    id: string;
+    id?: string;
     name: string;
     phone: string;
     ownerEmail: string;

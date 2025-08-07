@@ -99,6 +99,16 @@ export async function createBusiness(businessData: Omit<Business, 'id'>): Promis
     }
 }
 
+export async function updateBusiness(id: string, businessData: Omit<Business, 'id'>): Promise<{ success: boolean; message: string }> {
+    try {
+        await adminFirestore.collection('businesses').doc(id).update(businessData);
+        return { success: true, message: 'Negocio actualizado con éxito.' };
+    } catch (error: any) {
+        console.error("Error updating business:", error);
+        return { success: false, message: `Ocurrió un error al actualizar el negocio: ${error.message}` };
+    }
+}
+
 export async function getBusinesses(): Promise<Business[]> {
     try {
         const snapshot = await adminFirestore.collection('businesses').get();
@@ -109,6 +119,19 @@ export async function getBusinesses(): Promise<Business[]> {
     } catch (error) {
         console.error("Error fetching businesses:", error);
         return [];
+    }
+}
+
+export async function getBusinessById(id: string): Promise<Business | null> {
+    try {
+        const doc = await adminFirestore.collection('businesses').doc(id).get();
+        if (!doc.exists) {
+            return null;
+        }
+        return { id: doc.id, ...doc.data() } as Business;
+    } catch (error) {
+        console.error("Error fetching business by ID:", error);
+        return null;
     }
 }
 

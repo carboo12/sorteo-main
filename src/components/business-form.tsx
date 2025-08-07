@@ -14,12 +14,11 @@ import { CalendarIcon, Loader2, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { createBusiness } from "@/lib/actions";
+import { createBusiness, updateBusiness } from "@/lib/actions";
 import { useRouter } from "next/navigation";
-import type { Location } from "@/lib/types";
-
+import type { Business, Location } from "@/lib/types";
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "El nombre debe tener al menos 2 caracteres." }),
@@ -33,21 +32,39 @@ const formSchema = z.object({
   }).optional(),
 });
 
-export default function BusinessForm() {
+interface BusinessFormProps {
+    initialData?: Business | null;
+}
+
+export default function BusinessForm({ initialData }: BusinessFormProps) {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isLocating, setIsLocating] = useState(false);
     const { toast } = useToast();
     const router = useRouter();
 
+    const isEditMode = !!initialData;
+
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
-        defaultValues: {
+        defaultValues: isEditMode && initialData ? {
+            ...initialData,
+            licenseExpiresAt: new Date(initialData.licenseExpiresAt),
+        } : {
             name: "",
             phone: "",
             ownerEmail: "",
             address: "",
         },
     });
+
+    useEffect(() => {
+        if (isEditMode && initialData) {
+            form.reset({
+                ...initialData,
+                licenseExpiresAt: new Date(initialData.licenseExpiresAt),
+            });
+        }
+    }, [initialData, isEditMode, form]);
 
     const handleGetLocation = () => {
         setIsLocating(true);
@@ -73,13 +90,17 @@ export default function BusinessForm() {
     async function onSubmit(values: z.infer<typeof formSchema>) {
         setIsSubmitting(true);
         try {
-            const result = await createBusiness({
+            const businessData = {
                 ...values,
                 licenseExpiresAt: values.licenseExpiresAt.toISOString(),
-            });
+            };
+
+            const result = isEditMode && initialData?.id
+                ? await updateBusiness(initialData.id, businessData)
+                : await createBusiness(businessData);
 
             if (result.success) {
-                toast({ title: "¡Éxito!", description: "El negocio ha sido creado correctamente."});
+                toast({ title: "¡Éxito!", description: result.message });
                 router.push("/dashboard/businesses");
             } else {
                 throw new Error(result.message);
@@ -94,7 +115,7 @@ export default function BusinessForm() {
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Detalles del Negocio</CardTitle>
+                <CardTitle>{isEditMode ? 'Editar Detalles del Negocio' : 'Detalles del Negocio'}</CardTitle>
             </CardHeader>
             <CardContent>
                 <Form {...form}>
@@ -169,7 +190,7 @@ export default function BusinessForm() {
                                             mode="single"
                                             selected={field.value}
                                             onSelect={field.onChange}
-                                            disabled={(date) => date < new Date()}
+                                            disabled={(date) => date < new Date() && !isEditMode}
                                             initialFocus
                                         />
                                         </PopoverContent>
@@ -212,7 +233,7 @@ export default function BusinessForm() {
                              <Button type="button" variant="ghost" onClick={() => router.back()}>Cancelar</Button>
                              <Button type="submit" disabled={isSubmitting}>
                                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
-                                Crear Negocio
+                                {isEditMode ? 'Guardar Cambios' : 'Crear Negocio'}
                             </Button>
                         </div>
                     </form>

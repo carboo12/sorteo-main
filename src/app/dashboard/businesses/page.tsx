@@ -101,7 +101,9 @@ export default function BusinessesPage() {
                                 <TableCell>{business.ownerEmail}</TableCell>
                                 <TableCell>{new Date(business.licenseExpiresAt).toLocaleDateString()}</TableCell>
                                 <TableCell>
-                                    <Button variant="outline" size="sm">Editar</Button>
+                                    <Button variant="outline" size="sm" onClick={() => router.push(`/dashboard/businesses/${business.id}`)}>
+                                        Editar
+                                    </Button>
                                 </TableCell>
                             </TableRow>
                         ))}
