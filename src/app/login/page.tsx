@@ -41,7 +41,7 @@ export default function LoginPage() {
     setIsSubmitting(true);
     try {
         // 1. Check for Superuser in 'masterusers' collection first
-        const masterQuery = query(collection(db, "masterusers"), where("nombre", "==", values.username));
+        const masterQuery = query(collection(db, "masterusers"), where("nombre", "==", values.username.toLowerCase()));
         const masterSnapshot = await getDocs(masterQuery);
         
         if (!masterSnapshot.empty) {
@@ -61,7 +61,7 @@ export default function LoginPage() {
                 router.push('/dashboard');
                 return; // Stop execution after successful superuser login
             } else {
-                // Password does not match for superuser
+                // Password does not match for superuser, throw specific error and stop
                 throw new Error("Usuario o contraseña incorrectos.");
             }
         }
