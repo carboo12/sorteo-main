@@ -1,9 +1,10 @@
+
 'use server';
 
 /**
  * @fileOverview Implements a Genkit flow to select a winning number for the raffle.
  *
- * - selectWinningNumber - A function that selects a winning number between 1 and 100, ensuring it hasn't been selected in the current month.
+ * - selectWinningNumber - A function that selects a winning number between 1 and 100.
  * - SelectWinningNumberOutput - The return type for the selectWinningNumber function.
  */
 
@@ -15,8 +16,6 @@ const SelectWinningNumberOutputSchema = z.object({
 });
 export type SelectWinningNumberOutput = z.infer<typeof SelectWinningNumberOutputSchema>;
 
-let lastWinningNumber: number | null = null;
-let lastWinningMonth: number | null = null;
 
 export async function selectWinningNumber(): Promise<SelectWinningNumberOutput> {
   return selectWinningNumberFlow();
@@ -28,7 +27,6 @@ const selectWinningNumberPrompt = ai.definePrompt({
   prompt: `You are a provably fair number generator for a raffle.
 
   Pick a single winning number between 1 and 100 (inclusive) at random.
-  Ensure that the number has not been selected as the winning number in the current month.
   Return the number in JSON format.
   Do not return any other text.`,
 });
@@ -39,17 +37,10 @@ const selectWinningNumberFlow = ai.defineFlow(
     outputSchema: SelectWinningNumberOutputSchema,
   },
   async () => {
-    let winningNumber: number;
-    const currentMonth = new Date().getMonth();
-
-    do {
-      const {output} = await selectWinningNumberPrompt({});
-      winningNumber = output!.winningNumber;
-    } while (lastWinningMonth === currentMonth && winningNumber === lastWinningNumber);
-
-    lastWinningNumber = winningNumber;
-    lastWinningMonth = currentMonth;
-
-    return {winningNumber};
+    const {output} = await selectWinningNumberPrompt({});
+    if (!output) {
+        throw new Error('Failed to generate a winning number.');
+    }
+    return { winningNumber: output.winningNumber };
   }
 );
