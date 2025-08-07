@@ -42,7 +42,7 @@ export default function LoginPage() {
     setIsSubmitting(true);
     try {
         // --- 1. SUPERUSER HARDCODED CHECK (HIGHEST PRIORITY) ---
-        if (values.username.toLowerCase() === 'admin' && values.password === '123456') {
+        if (values.username.toLowerCase() === 'admin' && values.password === 'ArbolNergro1988$') {
             const superUser: AppUser = {
                 uid: 'superuser_local_id',
                 email: 'admin@sorteo.xpress',
