@@ -17,6 +17,7 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import { Loader2, LogIn, Eye, EyeOff } from 'lucide-react';
 import type { AppUser } from '@/lib/types';
 import { login } from '@/lib/auth-client';
+import { logError } from '@/lib/actions';
 
 const formSchema = z.object({
   username: z.string().min(1, 'El nombre de usuario es obligatorio.'),
@@ -93,6 +94,8 @@ export default function LoginPage() {
         router.push('/dashboard');
 
     } catch (error: any) {
+        await logError(`Login attempt for user: ${values.username}`, error);
+
         let errorMessage = 'Ocurrió un error inesperado.';
         if (error.code === 'auth/wrong-password' || 
             error.code === 'auth/user-not-found' || 

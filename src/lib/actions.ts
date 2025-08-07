@@ -7,6 +7,32 @@ import type { AppUser, Business, Ticket, TurnoData, TurnoInfo, Winner } from './
 import { selectWinningNumber } from '@/ai/flows/select-winning-number';
 import * as admin from 'firebase-admin';
 
+export async function logError(context: string, error: any): Promise<void> {
+    try {
+        const errorData: any = {
+            context: context,
+            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        };
+
+        if (error instanceof Error) {
+            errorData.errorMessage = error.message;
+            errorData.stack = error.stack;
+        } else if (typeof error === 'object' && error !== null) {
+            errorData.errorMessage = error.message || 'No message';
+            errorData.errorCode = error.code || null;
+            errorData.stack = error.stack || null;
+            errorData.details = JSON.stringify(error);
+        } else {
+            errorData.details = String(error);
+        }
+
+        await adminFirestore.collection('error_logs').add(errorData);
+    } catch (loggingError) {
+        console.error("FATAL: Could not write to error log.", loggingError);
+    }
+}
+
+
 export async function getOrCreateUser(uid: string, email: string | null): Promise<AppUser | null> {
     const userRef = adminFirestore.collection('users').doc(uid);
     const userSnap = await userRef.get();
