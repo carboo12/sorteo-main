@@ -1,5 +1,4 @@
 
-import 'dotenv/config';
 import * as admin from 'firebase-admin';
 
 let adminApp: admin.app.App | null = null;
@@ -44,7 +43,7 @@ export function isAdminReady(): { ready: boolean; message: string } {
     if (!hasEnvVars) {
         return {
             ready: false,
-            message: 'Las variables de entorno de Firebase Admin no están configuradas. Por favor, revisa tu archivo .env.'
+            message: 'Las variables de entorno de Firebase Admin no están configuradas. Por favor, revisa tu archivo .env.local.'
         };
     }
     if (initError) {
