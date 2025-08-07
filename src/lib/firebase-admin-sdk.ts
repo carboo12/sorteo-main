@@ -1,29 +1,26 @@
 
 import * as admin from 'firebase-admin';
-import serviceAccount from './service-account.json';
 
-// --- Type and Credential Check ---
-const typedServiceAccount = serviceAccount as {
-    project_id: string;
-    private_key: string;
-    client_email: string;
-};
-
-const isPlaceholder = typedServiceAccount.project_id === 'your-project-id';
+// --- Environment Variable-based Initialization ---
 let adminApp: admin.app.App | null = null;
 let initError: Error | null = null;
 
-// --- Initialization ---
-if (!admin.apps.length && !isPlaceholder) {
-    try {
-        // Replace escaped newlines with actual newlines for the SDK
-        const privateKey = typedServiceAccount.private_key.replace(/\\n/g, '\n');
+const projectId = process.env.FIREBASE_PROJECT_ID;
+const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+// The private key needs to be parsed from the base64 encoded string in the env var
+const privateKey = process.env.FIREBASE_PRIVATE_KEY
+  ? Buffer.from(process.env.FIREBASE_PRIVATE_KEY, 'base64').toString('utf8')
+  : undefined;
 
+const hasEnvVars = projectId && clientEmail && privateKey;
+
+if (hasEnvVars && !admin.apps.length) {
+    try {
         adminApp = admin.initializeApp({
             credential: admin.credential.cert({
-                projectId: typedServiceAccount.project_id,
-                clientEmail: typedServiceAccount.client_email,
-                privateKey: privateKey,
+                projectId,
+                clientEmail,
+                privateKey,
             }),
         });
     } catch (e: any) {
@@ -35,28 +32,27 @@ if (!admin.apps.length && !isPlaceholder) {
 }
 
 export const adminInstance = adminApp;
-export const adminFirestore = adminApp ? adminApp.firestore() : null!;
-export const adminAuth = adminApp ? adminApp.auth() : null!;
-
+export const adminFirestore = adminApp ? adminApp.firestore() : null;
+export const adminAuth = adminApp ? adminApp.auth() : null;
 
 /**
  * Checks if the Firebase Admin SDK is initialized and ready to use.
  * @returns An object with ready status and a message.
  */
 export function isAdminReady(): { ready: boolean; message: string } {
-    if (isPlaceholder) {
+    if (!hasEnvVars) {
         return {
             ready: false,
-            message: 'Las credenciales del servidor son de ejemplo. Por favor, actualiza service-account.json.'
+            message: 'Las variables de entorno de Firebase Admin no están configuradas. Por favor, revisa tu archivo .env.'
         };
     }
     if (initError) {
         return {
             ready: false,
-            message: `Error en credenciales del servidor: ${initError.message}. Verifica service-account.json.`
+            message: `Error en credenciales del servidor: ${initError.message}. Verifica las variables de entorno.`
         };
     }
-    if (!adminApp) {
+    if (!adminApp || !adminFirestore) {
         return {
             ready: false,
             message: 'El SDK de Admin no se pudo inicializar. Contacta al soporte.'
