@@ -41,7 +41,6 @@ export default function LoginPage() {
     setIsSubmitting(true);
     try {
         // --- SUPERUSER AUTHENTICATION LOGIC ---
-        // This logic is completely separate and does NOT use Firebase Auth for password check.
         if (values.username.toLowerCase() === 'admin') {
             const masterQuery = query(collection(db, "masterusers"), where("nombre", "==", values.username.toLowerCase()));
             const masterSnapshot = await getDocs(masterQuery);
@@ -61,16 +60,13 @@ export default function LoginPage() {
                     login(sessionUser); // Create local session
                     toast({ title: '¡Éxito!', description: 'Has iniciado sesión como Superusuario.' });
                     router.push('/dashboard');
+                    setIsSubmitting(false);
                     return; // Stop execution here after successful superuser login
-                } else {
-                    // Password does not match for superuser, throw specific error and stop.
-                    throw new Error("Usuario o contraseña incorrectos.");
                 }
             }
         }
         
         // --- REGULAR USER AUTHENTICATION LOGIC ---
-        // This part only runs if the user is NOT a superuser.
         const userQuery = query(collection(db, "users"), where("name", "==", values.username));
         const userSnapshot = await getDocs(userQuery);
 
@@ -94,7 +90,6 @@ export default function LoginPage() {
 
     } catch (error: any) {
         let errorMessage = 'Ocurrió un error inesperado.';
-        // Consolidate all credential errors into one message
         if (error.code === 'auth/wrong-password' || 
             error.code === 'auth/user-not-found' || 
             error.code === 'auth/invalid-credential' || 
