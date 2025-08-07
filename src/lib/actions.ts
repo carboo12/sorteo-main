@@ -31,7 +31,7 @@ export async function signInWithUsername(username: string, password: string): Pr
     try {
         const usersRef = adminFirestore.collection("users");
         // Firestore Admin SDK queries are case-sensitive. We query by lowercase username.
-        const userQuery = usersRef.where("nombre", "==", username.toLowerCase());
+        const userQuery = usersRef.where("nombre", "==", username);
         const userSnapshot = await userQuery.get();
 
         if (userSnapshot.empty) {
