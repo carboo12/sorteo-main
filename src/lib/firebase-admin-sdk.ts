@@ -7,9 +7,9 @@ let initError: Error | null = null;
 
 const projectId = process.env.FIREBASE_PROJECT_ID;
 const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-// The private key needs to be parsed from the base64 encoded string in the env var
+// The private key needs to be parsed correctly, replacing escaped newlines.
 const privateKey = process.env.FIREBASE_PRIVATE_KEY
-  ? Buffer.from(process.env.FIREBASE_PRIVATE_KEY, 'base64').toString('utf8')
+  ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
   : undefined;
 
 const hasEnvVars = projectId && clientEmail && privateKey;
