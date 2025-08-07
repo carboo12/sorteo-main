@@ -1,13 +1,11 @@
 
 'use server';
 
-import { adminAuth, adminFirestore } from './firebase-admin-sdk';
+import { adminFirestore, isAdminReady } from './firebase-admin-sdk';
 import type { AppUser, Business } from './types';
 
 // Helper function to find a user in a specific collection by username
 async function findUserInCollection(collectionName: string, username: string): Promise<any | null> {
-    if (!adminFirestore) return null;
-
     const normalizedUsername = username.toLowerCase();
     const snapshot = await adminFirestore
         .collection(collectionName)
@@ -18,40 +16,34 @@ async function findUserInCollection(collectionName: string, username: string): P
     if (snapshot.empty) {
         return null;
     }
-
-    return snapshot.docs[0].data();
+    
+    const userDoc = snapshot.docs[0];
+    return { id: userDoc.id, ...userDoc.data() };
 }
 
 
-/**
- * Finds a user by their username in masterusers or users collection.
- * This function is safe to be called from the client as a Server Action.
- * It only returns non-sensitive information.
- * @param username The username to search for.
- * @returns An object with success status, a message, and user data (email and role).
- */
 export async function signInWithUsername(username: string): Promise<{
   success: boolean;
   message: string;
   user?: { email: string; role: string, name: string, businessId?: string };
 }> {
-  if (!adminFirestore) {
-    return { success: false, message: 'El servicio de base de datos no está disponible. Contacta al administrador.' };
+
+  const { ready, message } = isAdminReady();
+  if (!ready) {
+      return { success: false, message };
   }
 
   try {
-    // 1. Check in 'masterusers' collection
     let userData = await findUserInCollection('masterusers', username);
     let role = 'superuser';
 
-    // 2. If not in 'masterusers', check in 'users' collection
     if (!userData) {
       userData = await findUserInCollection('users', username);
-      role = userData?.role || 'seller'; // Default role if not specified
+      role = 'seller'; 
     }
 
     if (!userData || !userData.email) {
-      return { success: false, message: 'Usuario no encontrado.' };
+      return { success: false, message: 'Usuario no encontrado o no tiene un email asociado.' };
     }
 
     return {
@@ -64,21 +56,17 @@ export async function signInWithUsername(username: string): Promise<{
         businessId: userData.businessId || null,
       },
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in signInWithUsername:', error);
-    return { success: false, message: 'Ocurrió un error en el servidor. Por favor, inténtalo de nuevo.' };
+    return { success: false, message: `Ocurrió un error en el servidor: ${error.message}` };
   }
 }
 
 
-/**
- * Gets or creates a user profile in Firestore.
- * Triggered after a successful Firebase client-side authentication.
- */
 export async function getOrCreateUser(uid: string, email: string | null): Promise<AppUser | null> {
-    if (!adminFirestore) {
-      console.error("Firestore Admin is not initialized.");
-      throw new Error("El servicio de base de datos no está disponible.");
+    const { ready, message } = isAdminReady();
+    if (!ready) {
+        throw new Error(message);
     }
   
     const userRef = adminFirestore.collection('users').doc(uid);
@@ -89,11 +77,9 @@ export async function getOrCreateUser(uid: string, email: string | null): Promis
     }
   
     if (!email) {
-      // Cannot create a user without an email
       return null;
     }
   
-    // Check if it's a superuser first
     const superuserSnap = await adminFirestore.collection('masterusers').where('email', '==', email).limit(1).get();
     if (!superuserSnap.empty) {
         const superuserData = superuserSnap.docs[0].data();
@@ -107,21 +93,18 @@ export async function getOrCreateUser(uid: string, email: string | null): Promis
         return appUser;
     }
 
-    // If not a superuser, it must be a business user created beforehand
     const businessUserSnap = await adminFirestore.collection('users').where('email', '==', email).limit(1).get();
      if (!businessUserSnap.empty) {
         const businessUserData = businessUserSnap.docs[0].data();
         const appUser: AppUser = {
-            uid, // This is the new UID from Auth
+            uid,
             email,
             name: businessUserData.nombre,
             role: businessUserData.role || 'seller',
             businessId: businessUserData.businessId || null,
         };
-        // Update the user document with the new UID
-        await adminFirestore.collection('users').doc(uid).set(appUser);
+        await userRef.set(appUser);
 
-        // Optional: delete the old doc if it had a different, placeholder UID
         if(businessUserSnap.docs[0].id !== uid) {
             await adminFirestore.collection('users').doc(businessUserSnap.docs[0].id).delete();
         }
@@ -129,28 +112,29 @@ export async function getOrCreateUser(uid: string, email: string | null): Promis
         return appUser;
     }
 
-    // If user is not pre-registered in masterusers or users, deny creation
-    throw new Error('El usuario no está registrado en el sistema. Contacta al administrador.');
+    throw new Error('El usuario no está pre-registrado. Contacta al administrador.');
 }
 
 
 export async function createBusiness(businessData: Omit<Business, 'id'>): Promise<{ success: boolean; message: string; businessId?: string }> {
-    if (!adminFirestore) {
-      return { success: false, message: 'El servicio de base de datos no está disponible.' };
+    const { ready, message } = isAdminReady();
+    if (!ready) {
+        return { success: false, message };
     }
 
     try {
         const businessRef = await adminFirestore.collection('businesses').add(businessData);
         return { success: true, message: 'Negocio creado con éxito.', businessId: businessRef.id };
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error creating business:", error);
-        return { success: false, message: 'Ocurrió un error al crear el negocio.' };
+        return { success: false, message: `Ocurrió un error al crear el negocio: ${error.message}` };
     }
 }
 
 export async function getBusinesses(): Promise<Business[]> {
-    if (!adminFirestore) {
-        console.error("Firestore Admin is not initialized.");
+    const { ready, message } = isAdminReady();
+    if (!ready) {
+        console.error(message);
         return [];
     }
     try {
@@ -167,7 +151,8 @@ export async function getBusinesses(): Promise<Business[]> {
 
 
 export async function getTurnoData(turnoInfo: { date: string; turno: string }, businessId: string) {
-    if (!adminFirestore) throw new Error("Server not initialized");
+    const { ready, message } = isAdminReady();
+    if (!ready) throw new Error(message);
     const docId = `${businessId}_${turnoInfo.date}_${turnoInfo.turno}`;
     const doc = await adminFirestore.collection('turnos').doc(docId).get();
     if (doc.exists) {
@@ -182,7 +167,9 @@ export async function buyTicket(
   name: string | null,
   businessId: string
 ) {
-    if (!adminFirestore) throw new Error("Server not initialized");
+    const { ready, message } = isAdminReady();
+    if (!ready) return { success: false, message };
+
     const docId = `${businessId}_${turnoInfo.date}_${turnoInfo.turno}`;
     const docRef = adminFirestore.collection('turnos').doc(docId);
 
@@ -204,7 +191,8 @@ export async function buyTicket(
 }
 
 export async function drawWinner(turnoInfo: { date: string; turno: string }, businessId: string) {
-  if (!adminFirestore || !adminAuth) throw new Error("Server not initialized");
+  const { ready, message } = isAdminReady();
+  if (!ready) return { success: false, message };
   
   const docId = `${businessId}_${turnoInfo.date}_${turnoInfo.turno}`;
   const turnoRef = adminFirestore.collection('turnos').doc(docId);
@@ -235,10 +223,10 @@ export async function drawWinner(turnoInfo: { date: string; turno: string }, bus
         date: turnoInfo.date,
       };
 
-      transaction.set(turnoRef, { winningNumber: winningNumber }, { merge: true });
-      transaction.set(businessRef, { 
+      transaction.update(turnoRef, { winningNumber });
+      transaction.update(businessRef, { 
         winnerHistory: admin.firestore.FieldValue.arrayUnion(winnerHistoryEntry)
-      }, { merge: true });
+      });
     });
 
     return { success: true, winningNumber, message: `El número ganador es ${winningNumber}!` };
@@ -248,7 +236,11 @@ export async function drawWinner(turnoInfo: { date: string; turno: string }, bus
 }
 
 export async function getWinnerHistory(businessId: string) {
-  if (!adminFirestore) throw new Error("Server not initialized");
+  const { ready, message } = isAdminReady();
+  if (!ready) {
+      console.error(message);
+      return [];
+  }
   const businessDoc = await adminFirestore.collection('businesses').doc(businessId).get();
   if (businessDoc.exists) {
     const data = businessDoc.data();

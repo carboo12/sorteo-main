@@ -37,35 +37,36 @@ export default function LoginPage() {
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
     try {
-      // 1. Server Action to find the user by username and get their email
       const result = await signInWithUsername(values.username);
 
       if (!result.success || !result.user?.email) {
-        throw new Error(result.message || 'Usuario o contraseña incorrectos.');
-      }
-
-      const { email, role } = result.user;
-
-      // 2. Client-side Firebase Auth sign-in with email and password
-      try {
-        await signInWithEmailAndPassword(auth, email, values.password);
-        toast({ title: '¡Éxito!', description: 'Has iniciado sesión correctamente.' });
-        router.push('/dashboard');
-        router.refresh(); // Refresh to update server-side session state
-      } catch (authError) {
-        console.error("Firebase Auth Error:", authError);
         toast({
             variant: 'destructive',
-            title: 'Error de Autenticación',
-            description: 'Contraseña incorrecta. Por favor, inténtalo de nuevo.',
+            title: 'Error de autenticación',
+            description: result.message || 'Usuario o contraseña incorrectos.',
         });
+        return;
       }
 
+      const { email } = result.user;
+
+      await signInWithEmailAndPassword(auth, email, values.password);
+      
+      toast({ title: '¡Éxito!', description: 'Has iniciado sesión correctamente.' });
+      router.push('/dashboard');
+      router.refresh(); 
+
     } catch (error: any) {
+        let errorMessage = 'Usuario o contraseña incorrectos.';
+        if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+            errorMessage = 'La contraseña es incorrecta. Por favor, inténtalo de nuevo.';
+        } else if (error.message) {
+            errorMessage = error.message;
+        }
         toast({
             variant: 'destructive',
             title: 'Error al Iniciar Sesión',
-            description: error.message,
+            description: errorMessage,
         });
     } finally {
       setIsSubmitting(false);
@@ -123,3 +124,4 @@ export default function LoginPage() {
     </main>
   );
 }
+

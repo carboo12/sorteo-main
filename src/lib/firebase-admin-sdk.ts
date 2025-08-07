@@ -2,38 +2,65 @@
 import * as admin from 'firebase-admin';
 import serviceAccount from './service-account.json';
 
-// Type assertion to ensure serviceAccount has the expected structure
+// --- Type and Credential Check ---
 const typedServiceAccount = serviceAccount as {
-    type: string;
     project_id: string;
-    private_key_id: string;
     private_key: string;
     client_email: string;
-    client_id: string;
-    auth_uri: string;
-    token_uri: string;
-    auth_provider_x509_cert_url: string;
-    client_x509_cert_url: string;
 };
 
-// Check if we're dealing with placeholder credentials
 const isPlaceholder = typedServiceAccount.project_id === 'your-project-id';
+let adminApp: admin.app.App | null = null;
+let initError: Error | null = null;
 
-let app: admin.app.App | null = null;
-
+// --- Initialization ---
 if (!admin.apps.length && !isPlaceholder) {
     try {
-        app = admin.initializeApp({
-            credential: admin.credential.cert(typedServiceAccount),
+        // Replace escaped newlines with actual newlines for the SDK
+        const privateKey = typedServiceAccount.private_key.replace(/\\n/g, '\n');
+
+        adminApp = admin.initializeApp({
+            credential: admin.credential.cert({
+                projectId: typedServiceAccount.project_id,
+                clientEmail: typedServiceAccount.client_email,
+                privateKey: privateKey,
+            }),
         });
-    } catch (error) {
-        console.error('Failed to initialize Firebase Admin SDK:', error);
-        // app remains null
+    } catch (e: any) {
+        console.error('Firebase Admin SDK Initialization Error:', e);
+        initError = e;
     }
 } else if (admin.apps.length) {
-    app = admin.app();
+    adminApp = admin.app();
 }
 
-export const adminInstance = app;
-export const adminFirestore = app ? app.firestore() : null;
-export const adminAuth = app ? app.auth() : null;
+export const adminInstance = adminApp;
+export const adminFirestore = adminApp ? adminApp.firestore() : null!;
+export const adminAuth = adminApp ? adminApp.auth() : null!;
+
+
+/**
+ * Checks if the Firebase Admin SDK is initialized and ready to use.
+ * @returns An object with ready status and a message.
+ */
+export function isAdminReady(): { ready: boolean; message: string } {
+    if (isPlaceholder) {
+        return {
+            ready: false,
+            message: 'Las credenciales del servidor son de ejemplo. Por favor, actualiza service-account.json.'
+        };
+    }
+    if (initError) {
+        return {
+            ready: false,
+            message: `Error en credenciales del servidor: ${initError.message}. Verifica service-account.json.`
+        };
+    }
+    if (!adminApp) {
+        return {
+            ready: false,
+            message: 'El SDK de Admin no se pudo inicializar. Contacta al soporte.'
+        };
+    }
+    return { ready: true, message: 'SDK de Admin listo.' };
+}
