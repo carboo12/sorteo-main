@@ -40,38 +40,41 @@ export default function LoginPage() {
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
     try {
-        // 1. Check for Superuser in 'masterusers' collection first
-        const masterQuery = query(collection(db, "masterusers"), where("nombre", "==", values.username.toLowerCase()));
-        const masterSnapshot = await getDocs(masterQuery);
-        
-        if (!masterSnapshot.empty) {
-            const masterDoc = masterSnapshot.docs[0];
-            const masterData = masterDoc.data();
+        // --- SUPERUSER AUTHENTICATION LOGIC ---
+        // This logic is completely separate and runs first.
+        if (values.username.toLowerCase() === 'admin') {
+            const masterQuery = query(collection(db, "masterusers"), where("nombre", "==", values.username.toLowerCase()));
+            const masterSnapshot = await getDocs(masterQuery);
             
-            // Superuser found, compare password directly from Firestore
-            if (masterData.contraseña === values.password) {
-                const sessionUser: AppUser = { 
-                    uid: masterDoc.id,
-                    name: masterData.nombre, 
-                    role: 'superuser', 
-                    email: masterData.email 
-                };
-                login(sessionUser); // Create local session
-                toast({ title: '¡Éxito!', description: 'Has iniciado sesión como Superusuario.' });
-                router.push('/dashboard');
-                return; // Stop execution after successful superuser login
-            } else {
-                // Password does not match for superuser, throw specific error and stop
-                throw new Error("Usuario o contraseña incorrectos.");
+            if (!masterSnapshot.empty) {
+                const masterDoc = masterSnapshot.docs[0];
+                const masterData = masterDoc.data();
+                
+                // Direct password comparison from Firestore
+                if (masterData.contraseña === values.password) {
+                    const sessionUser: AppUser = { 
+                        uid: masterDoc.id,
+                        name: masterData.nombre, 
+                        role: 'superuser', 
+                        email: masterData.email 
+                    };
+                    login(sessionUser); // Create local session
+                    toast({ title: '¡Éxito!', description: 'Has iniciado sesión como Superusuario.' });
+                    router.push('/dashboard');
+                    return; // Stop execution here after successful superuser login
+                } else {
+                    // Password does not match for superuser, throw specific error and stop.
+                    throw new Error("Usuario o contraseña incorrectos.");
+                }
             }
         }
         
-        // 2. If not superuser, check regular 'users' collection
+        // --- REGULAR USER AUTHENTICATION LOGIC ---
+        // This part only runs if the user is NOT a superuser.
         const userQuery = query(collection(db, "users"), where("name", "==", values.username));
         const userSnapshot = await getDocs(userQuery);
 
         if (userSnapshot.empty) {
-            // If user not found in both collections, throw error
             throw new Error("Usuario o contraseña incorrectos.");
         }
 
@@ -83,16 +86,19 @@ export default function LoginPage() {
             throw new Error("El usuario no tiene un correo electrónico configurado para iniciar sesión.");
         }
 
-        // 3. Sign in regular user with Firebase Auth
+        // Sign in regular user with Firebase Auth
         await signInWithEmailAndPassword(auth, userEmail, values.password);
 
-        // onAuthStateChanged in useAuth hook will handle the rest
         toast({ title: '¡Éxito!', description: 'Has iniciado sesión correctamente.' });
         router.push('/dashboard');
 
     } catch (error: any) {
         let errorMessage = 'Ocurrió un error inesperado.';
-        if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+        // Consolidate all credential errors into one message
+        if (error.code === 'auth/wrong-password' || 
+            error.code === 'auth/user-not-found' || 
+            error.code === 'auth/invalid-credential' || 
+            error.message === "Usuario o contraseña incorrectos.") {
             errorMessage = 'Usuario o contraseña incorrectos.';
         } else if (error.message) {
             errorMessage = error.message;
