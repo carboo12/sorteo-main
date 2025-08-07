@@ -45,36 +45,28 @@ export async function getOrCreateUser(uid: string, email: string | null): Promis
       return null;
     }
   
-    const superuserSnap = await adminFirestore.collection('masterusers').where('email', '==', email).limit(1).get();
-    if (!superuserSnap.empty) {
-        const superuserData = superuserSnap.docs[0].data();
-        const appUser: AppUser = {
-            uid,
-            email,
-            name: superuserData.nombre,
-            role: 'superuser',
-        };
-        await userRef.set(appUser);
-        return appUser;
-    }
+    // Check if the user is a pre-registered business user by email
+    const businessUserQuery = adminFirestore.collection('users').where('email', '==', email);
+    const businessUserSnapshot = await businessUserQuery.get();
+     
+    if (!businessUserSnapshot.empty) {
+        const oldUserDoc = businessUserSnapshot.docs[0];
+        const oldUserData = oldUserDoc.data();
+        const oldDocId = oldUserDoc.id;
 
-    const businessUserSnap = await adminFirestore.collection('users').where('email', '==', email).limit(1).get();
-     if (!businessUserSnap.empty) {
-        const businessUserData = businessUserSnap.docs[0].data();
+        // Create the definitive AppUser object with all data
         const appUser: AppUser = {
             uid,
             email,
-            name: businessUserData.nombre,
-            role: businessUserData.role || 'seller',
-            businessId: businessUserData.businessId || null,
+            name: oldUserData.name || 'Usuario', // Use existing name
+            role: oldUserData.role || 'seller', // Use existing role
+            businessId: oldUserData.businessId || null, // Critical: Use existing businessId
         };
         
-        const oldDocId = businessUserSnap.docs[0].id;
+        // Set the new user document with the correct Firebase Auth UID as the ID
+        await userRef.set(appUser);
         
-        // Set new user doc with UID
-        await adminFirestore.collection('users').doc(uid).set(appUser);
-        
-        // Delete old doc if it has a different, auto-generated ID
+        // Delete the old pre-registered document if its ID is different
         if(oldDocId !== uid) {
             await adminFirestore.collection('users').doc(oldDocId).delete();
         }
@@ -82,6 +74,7 @@ export async function getOrCreateUser(uid: string, email: string | null): Promis
         return appUser;
     }
 
+    // Fallback if user is not pre-registered (should not happen based on current logic)
     throw new Error('El usuario no está pre-registrado. Contacta al administrador.');
 }
 

@@ -41,7 +41,7 @@ export default function LoginPage() {
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
     try {
-      // --- SUPERUSER AUTHENTICATION LOGIC ---
+      // --- SUPERUSER AUTHENTICATION LOGIC (NON-FIREBASE AUTH) ---
       const masterQuery = query(collection(db, "masterusers"), where("nombre", "==", values.username));
       const masterSnapshot = await getDocs(masterQuery);
 
@@ -67,7 +67,7 @@ export default function LoginPage() {
         }
       }
 
-      // --- REGULAR USER AUTHENTICATION LOGIC ---
+      // --- REGULAR USER AUTHENTICATION LOGIC (FIREBASE AUTH) ---
       // If the user was not found in masterusers, proceed with normal user authentication.
       const userQuery = query(collection(db, "users"), where("name", "==", values.username));
       const userSnapshot = await getDocs(userQuery);
