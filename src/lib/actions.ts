@@ -38,7 +38,13 @@ export async function getOrCreateUser(uid: string, email: string | null): Promis
     const userSnap = await userRef.get();
   
     if (userSnap.exists) {
-      return userSnap.data() as AppUser;
+        const user = userSnap.data() as AppUser;
+        // Check if the user is disabled in our system
+        if (user.disabled) {
+            // Optional: sign out from firebase auth client-side if needed, but returning null is key
+            return null;
+        }
+      return user;
     }
   
     if (!email) {
@@ -62,6 +68,7 @@ export async function getOrCreateUser(uid: string, email: string | null): Promis
             role: oldUserData.role || 'seller', // Use existing role
             businessId: oldUserData.businessId || null, // Critical: Use existing businessId
             createdBy: oldUserData.createdBy || null,
+            disabled: oldUserData.disabled || false,
         };
         
         // Set the new user document with the correct Firebase Auth UID as the ID
@@ -72,6 +79,7 @@ export async function getOrCreateUser(uid: string, email: string | null): Promis
             await adminFirestore.collection('users').doc(oldDocId).delete();
         }
         
+        if (appUser.disabled) return null;
         return appUser;
     }
 
@@ -137,6 +145,7 @@ export async function createUser(userData: UserFormData): Promise<{ success: boo
             role: userData.role,
             businessId: userData.businessId,
             createdBy: userData.createdBy,
+            disabled: false,
         };
         await userRef.set(appUser);
 
@@ -149,6 +158,24 @@ export async function createUser(userData: UserFormData): Promise<{ success: boo
             message = 'El correo electrónico ya está en uso por otro usuario.';
         }
         return { success: false, message: message };
+    }
+}
+
+export async function toggleUserStatus(uid: string, disabled: boolean): Promise<{ success: boolean, message: string }> {
+    try {
+        // Update Firebase Auth state
+        await adminAuth.updateUser(uid, { disabled });
+
+        // Update Firestore document state
+        const userRef = adminFirestore.collection('users').doc(uid);
+        await userRef.update({ disabled });
+        
+        const action = disabled ? "inhabilitado" : "habilitado";
+        return { success: true, message: `Usuario ${action} correctamente.` };
+
+    } catch (error: any) {
+        console.error(`Error toggling user status for ${uid}:`, error);
+        return { success: false, message: `Ocurrió un error: ${error.message}` };
     }
 }
 

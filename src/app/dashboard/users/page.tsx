@@ -1,16 +1,26 @@
+
 'use client';
 
 import { useEffect, useState } from 'react';
 import DashboardLayout from '@/components/dashboard-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { PlusCircle, User, Loader2 } from 'lucide-react';
+import { PlusCircle, User, Loader2, MoreHorizontal, Pencil, Ban } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
-import { getUsers, getBusinesses } from '@/lib/actions';
+import { getUsers, getBusinesses, toggleUserStatus } from '@/lib/actions';
 import type { AppUser, Business } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { UserForm } from '@/components/user-form';
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 export default function UsersPage() {
   const { user, loading: authLoading } = useAuth();
@@ -18,6 +28,7 @@ export default function UsersPage() {
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const { toast } = useToast();
 
   const fetchData = async () => {
     if (!user) return;
@@ -46,6 +57,17 @@ export default function UsersPage() {
     fetchData(); // Re-fetch users when a new one is created
     setIsDialogOpen(false); // Close the dialog
   }
+
+  const handleToggleStatus = async (uid: string, currentStatus: boolean | undefined) => {
+    const newStatus = !currentStatus;
+    const result = await toggleUserStatus(uid, newStatus);
+    if (result.success) {
+      toast({ title: 'Éxito', description: result.message });
+      fetchData(); // Refresh data
+    } else {
+      toast({ variant: 'destructive', title: 'Error', description: result.message });
+    }
+  };
 
   if (authLoading || loading) {
     return (
@@ -108,15 +130,42 @@ export default function UsersPage() {
                             <TableHead>Email</TableHead>
                             <TableHead>Rol</TableHead>
                             <TableHead>Negocio</TableHead>
+                            <TableHead>Estado</TableHead>
+                            <TableHead className='text-right'>Acciones</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {users.map((u) => (
-                            <TableRow key={u.uid}>
+                        {users.filter(u => u.uid !== user?.uid).map((u) => (
+                            <TableRow key={u.uid} className={cn(u.disabled && "text-muted-foreground opacity-50")}>
                                 <TableCell>{u.name}</TableCell>
                                 <TableCell>{u.email}</TableCell>
-                                <TableCell>{u.role}</TableCell>
+                                <TableCell className="capitalize">{u.role}</TableCell>
                                 <TableCell>{businesses.find(b => b.id === u.businessId)?.name || 'N/A'}</TableCell>
+                                <TableCell>
+                                  <Badge variant={u.disabled ? 'destructive' : 'default'}>
+                                    {u.disabled ? 'Inhabilitado' : 'Activo'}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className='text-right'>
+                                  <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                          <Button variant="ghost" className="h-8 w-8 p-0">
+                                              <span className="sr-only">Abrir menú</span>
+                                              <MoreHorizontal className="h-4 w-4" />
+                                          </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end">
+                                          <DropdownMenuItem onClick={() => alert('Función de editar no implementada aún.')}>
+                                              <Pencil className="mr-2 h-4 w-4" />
+                                              <span>Editar</span>
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem onClick={() => handleToggleStatus(u.uid, u.disabled)}>
+                                              <Ban className="mr-2 h-4 w-4" />
+                                              <span>{u.disabled ? 'Habilitar' : 'Inhabilitar'}</span>
+                                          </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </TableCell>
                             </TableRow>
                         ))}
                     </TableBody>

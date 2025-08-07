@@ -31,6 +31,7 @@ export interface AppUser {
     role: 'superuser' | 'admin' | 'seller';
     businessId: string | null;
     createdBy?: string | null;
+    disabled?: boolean;
 }
 
 export interface Location {
