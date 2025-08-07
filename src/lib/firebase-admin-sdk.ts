@@ -1,10 +1,8 @@
-
 import * as admin from 'firebase-admin';
 
 let adminApp: admin.app.App | null = null;
 let initError: Error | null = null;
 
-// Check if the required environment variables are set.
 const hasEnvVars =
   process.env.FIREBASE_PROJECT_ID &&
   process.env.FIREBASE_CLIENT_EMAIL &&
@@ -12,8 +10,6 @@ const hasEnvVars =
 
 if (hasEnvVars && !admin.apps.length) {
     try {
-        // The private key from the .env file has its newlines escaped.
-        // We need to replace the \\n characters with actual newline characters.
         const privateKey = process.env.FIREBASE_PRIVATE_KEY!.replace(/\\n/g, '\n');
 
         adminApp = admin.initializeApp({
@@ -35,10 +31,7 @@ export const adminInstance = adminApp;
 export const adminFirestore = adminApp ? adminApp.firestore() : null;
 export const adminAuth = adminApp ? adminApp.auth() : null;
 
-/**
- * Checks if the Firebase Admin SDK is initialized and ready to use.
- * @returns An object with ready status and a message.
- */
+
 export function isAdminReady(): { ready: boolean; message: string } {
     if (!hasEnvVars) {
         return {
