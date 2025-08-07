@@ -1,37 +1,10 @@
-
-'use client';
-
-import { useEffect, useState } from 'react';
-import DashboardLayout from "@/components/dashboard-layout";
-import BusinessForm from "@/components/business-form";
 import { getBusinessById } from '@/lib/actions';
-import type { Business } from '@/lib/types';
-import { Loader2 } from 'lucide-react';
+import EditBusinessClient from '@/components/edit-business-client';
+import DashboardLayout from '@/components/dashboard-layout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
-export default function EditBusinessPage({ params }: { params: { id: string } }) {
-    const [business, setBusiness] = useState<Business | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-
-    useEffect(() => {
-        const fetchBusiness = async () => {
-            try {
-                const fetchedBusiness = await getBusinessById(params.id);
-                if (fetchedBusiness) {
-                    setBusiness(fetchedBusiness);
-                } else {
-                    setError("No se pudo encontrar el negocio especificado.");
-                }
-            } catch (err) {
-                setError("Ocurrió un error al cargar los datos del negocio.");
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchBusiness();
-    }, [params.id]);
+export default async function EditBusinessPage({ params }: { params: { id: string } }) {
+    const business = await getBusinessById(params.id);
 
     return (
         <DashboardLayout>
@@ -44,19 +17,17 @@ export default function EditBusinessPage({ params }: { params: { id: string } })
                         </p>
                     </div>
                 </div>
-                {loading ? (
-                    <div className="flex justify-center items-center h-64">
-                        <Loader2 className="h-16 w-16 animate-spin text-primary" />
-                    </div>
-                ) : error ? (
+                {business ? (
+                    <EditBusinessClient business={business} />
+                ) : (
                     <Card className="bg-destructive/10">
                         <CardHeader>
                             <CardTitle>Error</CardTitle>
-                            <CardDescription className="text-destructive">{error}</CardDescription>
+                            <CardDescription className="text-destructive">
+                                No se pudo encontrar el negocio especificado o ocurrió un error al cargarlo.
+                            </CardDescription>
                         </CardHeader>
                     </Card>
-                ) : (
-                    <BusinessForm initialData={business} />
                 )}
             </div>
         </DashboardLayout>
