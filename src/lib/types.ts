@@ -40,7 +40,7 @@ export interface Location {
 }
 
 export interface Business {
-    id?: string;
+    id: string;
     name: string;
     phone: string;
     ownerEmail: string;
@@ -57,5 +57,4 @@ export interface UserFormData {
     password: string;
     role: 'admin' | 'seller';
     businessId: string | null;
-    createdBy: string | null;
 }

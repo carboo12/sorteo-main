@@ -33,7 +33,7 @@ const formSchema = z.object({
 });
 
 interface BusinessFormProps {
-    initialData?: Business | null;
+    initialData?: Omit<Business, 'id'> & { id: string } | null;
 }
 
 export default function BusinessForm({ initialData }: BusinessFormProps) {
@@ -102,6 +102,7 @@ export default function BusinessForm({ initialData }: BusinessFormProps) {
             if (result.success) {
                 toast({ title: "¡Éxito!", description: result.message });
                 router.push("/dashboard/businesses");
+                router.refresh();
             } else {
                 throw new Error(result.message);
             }

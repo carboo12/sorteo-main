@@ -12,7 +12,7 @@ import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { createUser } from "@/lib/actions";
-import type { Business } from "@/lib/types";
+import type { Business, AppUser, UserFormData } from "@/lib/types";
 
 const formSchema = z.object({
   name: z.string().min(2, "El nombre es muy corto."),
@@ -25,12 +25,14 @@ const formSchema = z.object({
 interface UserFormProps {
     businesses: Business[];
     onUserCreated: () => void;
-    creatorId: string | null;
+    creator: AppUser;
 }
 
-export function UserForm({ businesses, onUserCreated, creatorId }: UserFormProps) {
+export function UserForm({ businesses, onUserCreated, creator }: UserFormProps) {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const { toast } = useToast();
+    
+    const isSuperuser = creator.role === 'superuser';
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -39,21 +41,18 @@ export function UserForm({ businesses, onUserCreated, creatorId }: UserFormProps
             email: "",
             password: "",
             role: "seller",
-            businessId: null,
+            businessId: isSuperuser ? null : creator.businessId,
         },
     });
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
-        if (!creatorId) {
+        if (!creator) {
             toast({ variant: "destructive", title: "Error", description: "No se pudo identificar al creador del usuario." });
             return;
         }
         setIsSubmitting(true);
         try {
-            const result = await createUser({
-                ...values,
-                createdBy: creatorId,
-            });
+            const result = await createUser(values, creator);
 
             if (result.success) {
                 toast({ title: "¡Éxito!", description: result.message });
@@ -138,14 +137,14 @@ export function UserForm({ businesses, onUserCreated, creatorId }: UserFormProps
                         render={({ field }) => (
                             <FormItem>
                             <FormLabel>Negocio</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value ?? ""}>
+                            <Select onValueChange={field.onChange} defaultValue={field.value ?? ""} disabled={!isSuperuser}>
                                 <FormControl>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Asignar a un negocio" />
                                 </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                    <SelectItem value="null">Ninguno</SelectItem>
+                                    {isSuperuser && <SelectItem value="null">Ninguno</SelectItem>}
                                     {businesses.map(b => (
                                         <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
                                     ))}

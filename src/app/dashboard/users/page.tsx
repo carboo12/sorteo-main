@@ -35,8 +35,8 @@ export default function UsersPage() {
     setLoading(true);
     try {
       const [fetchedUsers, fetchedBusinesses] = await Promise.all([
-          getUsers(),
-          user.role === 'superuser' ? getBusinesses() : Promise.resolve([])
+          getUsers(user),
+          getBusinesses(user.role === 'admin' ? user.businessId : null)
       ]);
       setUsers(fetchedUsers);
       setBusinesses(fetchedBusinesses);
@@ -48,7 +48,7 @@ export default function UsersPage() {
   };
 
   useEffect(() => {
-    if (!authLoading) {
+    if (!authLoading && user) {
       fetchData();
     }
   }, [user, authLoading]);
@@ -101,7 +101,7 @@ export default function UsersPage() {
                     <DialogHeader>
                         <DialogTitle>Crear Nuevo Usuario</DialogTitle>
                     </DialogHeader>
-                    <UserForm businesses={businesses} onUserCreated={onUserCreated} creatorId={user?.uid ?? null} />
+                    {user && <UserForm businesses={businesses} onUserCreated={onUserCreated} creator={user} />}
                 </DialogContent>
             </Dialog>
           </div>

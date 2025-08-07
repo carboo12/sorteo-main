@@ -133,9 +133,13 @@ export async function updateBusiness(id: string, businessData: Omit<Business, 'i
     }
 }
 
-export async function getBusinesses(): Promise<Business[]> {
+export async function getBusinesses(businessId?: string | null): Promise<Business[]> {
     try {
-        const snapshot = await adminFirestore.collection('businesses').get();
+        let query: admin.firestore.Query = adminFirestore.collection('businesses');
+        if (businessId) {
+            query = query.where(admin.firestore.FieldPath.documentId(), '==', businessId);
+        }
+        const snapshot = await query.get();
         if (snapshot.empty) {
             return [];
         }
@@ -159,9 +163,17 @@ export async function getBusinessById(id: string): Promise<Business | null> {
     }
 }
 
-export async function getUsers(): Promise<AppUser[]> {
+export async function getUsers(requestingUser: AppUser): Promise<AppUser[]> {
     try {
-        const snapshot = await adminFirestore.collection('users').get();
+        let query: admin.firestore.Query = adminFirestore.collection('users');
+
+        if (requestingUser.role === 'admin') {
+            if (!requestingUser.businessId) return []; // Admin must have a business
+            query = query.where('businessId', '==', requestingUser.businessId);
+        } 
+        // Superuser gets all users, so no filter is applied.
+        
+        const snapshot = await query.get();
         if (snapshot.empty) {
             return [];
         }
@@ -173,8 +185,10 @@ export async function getUsers(): Promise<AppUser[]> {
 }
 
 
-export async function createUser(userData: UserFormData): Promise<{ success: boolean; message: string; }> {
+export async function createUser(userData: UserFormData, creator: AppUser): Promise<{ success: boolean; message: string; }> {
     try {
+        const businessIdToSet = creator.role === 'superuser' ? userData.businessId : creator.businessId;
+
         // 1. Create user in Firebase Auth
         const userRecord = await adminAuth.createUser({
             email: userData.email,
@@ -190,8 +204,8 @@ export async function createUser(userData: UserFormData): Promise<{ success: boo
             name: userData.name,
             email: userData.email,
             role: userData.role,
-            businessId: userData.businessId,
-            createdBy: userData.createdBy,
+            businessId: businessIdToSet,
+            createdBy: creator.uid,
             disabled: false,
         };
         await userRef.set(appUser);
