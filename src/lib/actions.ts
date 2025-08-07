@@ -7,65 +7,6 @@ import type { AppUser, Business, Ticket, TurnoData, TurnoInfo, Winner } from './
 import { selectWinningNumber } from '@/ai/flows/select-winning-number';
 import * as admin from 'firebase-admin';
 
-// Helper function to find a user in a specific collection by username
-async function findUserInCollection(collectionName: string, username: string): Promise<any | null> {
-    const snapshot = await adminFirestore
-        .collection(collectionName)
-        .where('nombre', '==', username)
-        .limit(1)
-        .get();
-
-    if (snapshot.empty) {
-        return null;
-    }
-    
-    const userDoc = snapshot.docs[0];
-    return { id: userDoc.id, ...userDoc.data() };
-}
-
-
-export async function signInWithUsername(username: string): Promise<{
-  success: boolean;
-  message: string;
-  user?: { email: string; role: string, name: string, businessId?: string };
-}> {
-  try {
-    const superuser = await findUserInCollection('masterusers', username);
-    if (superuser && superuser.email) {
-      return {
-        success: true,
-        message: 'Superusuario encontrado.',
-        user: {
-          email: superuser.email,
-          role: 'superuser',
-          name: superuser.nombre,
-        },
-      };
-    }
-
-    const businessUser = await findUserInCollection('users', username);
-    if (businessUser && businessUser.email) {
-       return {
-        success: true,
-        message: 'Usuario encontrado.',
-        user: {
-          email: businessUser.email,
-          role: businessUser.role || 'seller', // Default to 'seller' if no role
-          name: businessUser.nombre,
-          businessId: businessUser.businessId || null,
-        },
-      };
-    }
-
-    return { success: false, message: 'Usuario no encontrado.' };
-
-  } catch (error: any) {
-    console.error('Error in signInWithUsername:', error);
-    return { success: false, message: `Ocurrió un error en el servidor: ${error.message}` };
-  }
-}
-
-
 export async function getOrCreateUser(uid: string, email: string | null): Promise<AppUser | null> {
     const userRef = adminFirestore.collection('users').doc(uid);
     const userSnap = await userRef.get();
@@ -101,10 +42,15 @@ export async function getOrCreateUser(uid: string, email: string | null): Promis
             role: businessUserData.role || 'seller',
             businessId: businessUserData.businessId || null,
         };
-        await userRef.set(appUser);
         
-        if(businessUserSnap.docs[0].id !== uid) {
-            await adminFirestore.collection('users').doc(businessUserSnap.docs[0].id).delete();
+        const oldDocId = businessUserSnap.docs[0].id;
+        
+        // Set new user doc with UID
+        await adminFirestore.collection('users').doc(uid).set(appUser);
+        
+        // Delete old doc if it has a different, auto-generated ID
+        if(oldDocId !== uid) {
+            await adminFirestore.collection('users').doc(oldDocId).delete();
         }
         
         return appUser;

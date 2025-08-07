@@ -1,11 +1,11 @@
 
 'use client';
 
-import { initializeApp, getApps, getApp, FirebaseOptions } from 'firebase/app';
+import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
-const firebaseConfig: FirebaseOptions = {
+const firebaseConfig = {
   apiKey: "AIzaSyDjebs_A0o3ULi4JzfW0_PMc4u7vx2ClZ0",
   authDomain: "sorteo-xpress.firebaseapp.com",
   projectId: "sorteo-xpress",
@@ -15,7 +15,7 @@ const firebaseConfig: FirebaseOptions = {
 };
 
 // Initialize Firebase
-const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+const app: FirebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 

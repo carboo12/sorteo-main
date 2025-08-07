@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
@@ -11,10 +11,11 @@ import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { signInWithUsername } from '@/lib/actions';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
+import { collection, query, where, getDocs, getFirestore } from 'firebase/firestore';
 import { Loader2, LogIn, Eye, EyeOff } from 'lucide-react';
+import type { AppUser } from '@/lib/types';
 
 const formSchema = z.object({
   username: z.string().min(1, 'El nombre de usuario es obligatorio.'),
@@ -38,24 +39,44 @@ export default function LoginPage() {
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
     try {
-      const result = await signInWithUsername(values.username);
+        // Check for superuser in 'masterusers' collection
+        const masterQuery = query(collection(db, "masterusers"), where("nombre", "==", values.username));
+        const masterSnapshot = await getDocs(masterQuery);
+        
+        if (!masterSnapshot.empty) {
+            const masterDoc = masterSnapshot.docs[0];
+            const masterData = masterDoc.data();
+            // This is a simplified check, ideally password should not be stored in plain text
+            if (masterData.password === values.password) {
+                 await signInWithEmailAndPassword(auth, masterData.email, values.password);
+                 toast({ title: '¡Éxito!', description: 'Has iniciado sesión como Superusuario.' });
+                 router.push('/dashboard');
+                 router.refresh();
+                 return;
+            }
+        }
+        
+        // If not superuser, check regular 'users' collection
+        const userQuery = query(collection(db, "users"), where("name", "==", values.username));
+        const userSnapshot = await getDocs(userQuery);
 
-      if (!result.success || !result.user?.email) {
-        toast({
-            variant: 'destructive',
-            title: 'Error de autenticación',
-            description: result.message || 'Usuario o contraseña incorrectos.',
-        });
-        return;
-      }
+        if (userSnapshot.empty) {
+            throw new Error("Usuario o contraseña incorrectos.");
+        }
 
-      const { email } = result.user;
+        const userDoc = userSnapshot.docs[0];
+        const userData = userDoc.data() as AppUser;
+        const userEmail = userData.email;
 
-      await signInWithEmailAndPassword(auth, email, values.password);
-      
-      toast({ title: '¡Éxito!', description: 'Has iniciado sesión correctamente.' });
-      router.push('/dashboard');
-      router.refresh(); 
+        if (!userEmail) {
+            throw new Error("El usuario no tiene un correo electrónico configurado para iniciar sesión.");
+        }
+
+        await signInWithEmailAndPassword(auth, userEmail, values.password);
+
+        toast({ title: '¡Éxito!', description: 'Has iniciado sesión correctamente.' });
+        router.push('/dashboard');
+        router.refresh();
 
     } catch (error: any) {
         let errorMessage = 'Usuario o contraseña incorrectos.';
