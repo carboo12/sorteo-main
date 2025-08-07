@@ -1,163 +1,125 @@
 
 'use client';
 
-import { useState, FormEvent, useEffect } from 'react';
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Eye, EyeOff, Loader2, User as UserIcon } from "lucide-react";
-import { useToast } from '@/hooks/use-toast';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
-import { login, getCurrentUser } from '@/lib/auth-client';
+import { z } from 'zod';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { useToast } from '@/hooks/use-toast';
 import { signInWithUsername } from '@/lib/actions';
+import { auth } from '@/lib/firebase';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { Loader2, LogIn } from 'lucide-react';
 
+const formSchema = z.object({
+  username: z.string().min(1, 'El nombre de usuario es obligatorio.'),
+  password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres.'),
+});
 
 export default function LoginPage() {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { toast } = useToast();
   const router = useRouter();
+  const { toast } = useToast();
 
-  useEffect(() => {
-    // Redirige si ya hay un usuario en la sesión del cliente
-    if (getCurrentUser()) {
-      router.replace('/dashboard');
-    }
-  }, [router]);
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      username: '',
+      password: '',
+    },
+  });
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!username || !password) {
-        toast({
-            variant: "destructive",
-            title: "Campos Incompletos",
-            description: "Por favor, introduce tu nombre de usuario y contraseña.",
-        });
-        return;
-    }
+  const handleSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
-
     try {
-        const result = await signInWithUsername(username, password);
+      // 1. Server Action to find the user by username and get their email
+      const result = await signInWithUsername(values.username);
 
-        if (!result.success || !result.user || !result.user.email) {
-            toast({
-                variant: "destructive",
-                title: "Error de Inicio de Sesión",
-                description: result.message || 'Usuario o contraseña incorrectos.',
-            });
-            return;
-        }
+      if (!result.success || !result.user?.email) {
+        throw new Error(result.message || 'Usuario o contraseña incorrectos.');
+      }
 
-        const appUser = result.user;
-        const userEmail = appUser.email;
+      const { email, role } = result.user;
 
-        const userCredential = await signInWithEmailAndPassword(auth, userEmail, password);
-        const firebaseUser = userCredential.user;
-        
-        login({
-            uid: firebaseUser.uid,
-            email: appUser.email,
-            username: appUser.username,
-            nombre: appUser.nombre,
-            role: appUser.role,
-            businessId: appUser.businessId
-        });
-
-        toast({ title: `¡Bienvenido, ${appUser.nombre}!`});
+      // 2. Client-side Firebase Auth sign-in with email and password
+      try {
+        await signInWithEmailAndPassword(auth, email, values.password);
+        toast({ title: '¡Éxito!', description: 'Has iniciado sesión correctamente.' });
         router.push('/dashboard');
+        router.refresh(); // Refresh to update server-side session state
+      } catch (authError) {
+        console.error("Firebase Auth Error:", authError);
+        toast({
+            variant: 'destructive',
+            title: 'Error de Autenticación',
+            description: 'Contraseña incorrecta. Por favor, inténtalo de nuevo.',
+        });
+      }
 
     } catch (error: any) {
-        console.error("Error de inicio de sesión: ", error);
-        
-        let errorMessage = "Ocurrió un error inesperado.";
-        if (error.message) {
-            errorMessage = error.message;
-        }
-
-        // Mapeo de errores de Firebase Auth a mensajes amigables
-        if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
-            errorMessage = "Usuario o contraseña incorrectos.";
-        }
-
         toast({
-            variant: "destructive",
-            title: "Error de Inicio de Sesión",
-            description: errorMessage,
+            variant: 'destructive',
+            title: 'Error al Iniciar Sesión',
+            description: error.message,
         });
     } finally {
-        setIsSubmitting(false);
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
-      <div className="w-full max-w-md">
-        <form onSubmit={handleSubmit}>
-          <Card className="shadow-2xl">
-            <CardHeader className="text-center">
-              <CardTitle className="text-3xl font-bold text-primary">Sorteo Xpress</CardTitle>
-              <CardDescription>Bienvenido de nuevo. Inicia sesión para continuar.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="username">Nombre de Usuario</Label>
-                <Input
-                  id="username"
-                  type="text"
-                  placeholder="tu-usuario"
-                  required
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value.toLowerCase())} // Guardar en minúsculas
-                  disabled={isSubmitting}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Contraseña</Label>
-                <div className="relative">
-                    <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="••••••••"
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    disabled={isSubmitting}
-                    />
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="absolute bottom-0 right-1 h-8 w-8"
-                        onClick={() => setShowPassword(!showPassword)}
-                    >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        <span className="sr-only">Toggle password visibility</span>
-                    </Button>
-                </div>
-              </div>
-            </CardContent>
-            <CardFooter>
+    <main className="flex min-h-screen flex-col items-center justify-center bg-slate-100 p-4">
+      <Card className="w-full max-w-md shadow-lg">
+        <CardHeader className="text-center">
+          <CardTitle className="text-3xl font-bold tracking-tighter text-primary">Sorteo Xpress</CardTitle>
+          <CardDescription>Ingresa tus credenciales para acceder al sistema.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+              <FormField
+                control={form.control}
+                name="username"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nombre de Usuario</FormLabel>
+                    <FormControl>
+                      <Input placeholder="tu-usuario" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Contraseña</FormLabel>
+                    <FormControl>
+                      <Input type="password" placeholder="••••••••" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <Button type="submit" className="w-full" disabled={isSubmitting}>
-                {isSubmitting ? <Loader2 className="animate-spin" /> : <UserIcon className="mr-2" />}
-                {isSubmitting ? 'Verificando...' : 'Iniciar Sesión'}
+                {isSubmitting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <LogIn className="mr-2 h-4 w-4" />
+                )}
+                Iniciar Sesión
               </Button>
-            </CardFooter>
-          </Card>
-        </form>
-      </div>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
     </main>
   );
 }

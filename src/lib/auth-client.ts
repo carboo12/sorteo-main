@@ -3,54 +3,34 @@
 
 import type { AppUser } from './types';
 
-const USER_SESSION_KEY = 'sorteo_xpress_user_session';
+const USER_KEY = 'app_user';
 
-/**
- * Guarda la información del usuario en localStorage para iniciar una sesión.
- * @param user - El objeto de usuario para guardar.
- */
-export function login(user: AppUser): void {
+export function login(user: AppUser) {
   if (typeof window !== 'undefined') {
-    try {
-      window.localStorage.setItem(USER_SESSION_KEY, JSON.stringify(user));
-      // Forzar la actualización del token de Firebase Auth, aunque la sesión principal es local
-      // Esto asegura que las llamadas a `useAuth` se actualicen
-      window.dispatchEvent(new Event('storage'));
-    } catch (error) {
-      console.error("Error al guardar la sesión del usuario:", error);
-    }
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+    window.dispatchEvent(new Event('storage')); // Notify other tabs
   }
 }
 
-/**
- * Elimina la información del usuario de localStorage para cerrar la sesión.
- */
-export function signOutUser(): void {
+export function signOutUser() {
   if (typeof window !== 'undefined') {
-    try {
-      window.localStorage.removeItem(USER_SESSION_KEY);
-      // Limpiar cookie de Firebase por si acaso
-      document.cookie = 'firebaseIdToken=; path=/; max-age=-1';
-      window.dispatchEvent(new Event('storage'));
-    } catch (error) {
-      console.error("Error al cerrar la sesión del usuario:", error);
-    }
+    localStorage.removeItem(USER_KEY);
+    window.dispatchEvent(new Event('storage')); // Notify other tabs
   }
 }
 
-/**
- * Obtiene el usuario actual desde localStorage.
- * @returns El objeto de usuario si existe, de lo contrario null.
- */
 export function getCurrentUser(): AppUser | null {
   if (typeof window === 'undefined') {
     return null;
   }
+  const userJson = localStorage.getItem(USER_KEY);
+  if (!userJson) {
+    return null;
+  }
   try {
-    const userSession = window.localStorage.getItem(USER_SESSION_KEY);
-    return userSession ? JSON.parse(userSession) : null;
+    return JSON.parse(userJson);
   } catch (error) {
-    console.error("Error al obtener la sesión del usuario:", error);
+    console.error('Failed to parse user from localStorage', error);
     return null;
   }
 }
