@@ -1,4 +1,7 @@
 
+import { initializeApp, getApps, App, cert } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
 import * as admin from 'firebase-admin';
 
 const serviceAccount = {
@@ -9,13 +12,15 @@ const serviceAccount = {
     "client_email": "firebase-adminsdk-fbsvc@sorteo-xpress.iam.gserviceaccount.com",
 };
 
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount)
-  });
-}
 
-const adminFirestore = admin.firestore();
-const adminAuth = admin.auth();
+const adminApp: App =
+  getApps().length > 0
+    ? getApps()[0]
+    : initializeApp({
+        credential: cert(serviceAccount as admin.ServiceAccount),
+      });
+
+const adminFirestore = getFirestore(adminApp);
+const adminAuth = getAuth(adminApp);
 
 export { admin, adminFirestore, adminAuth };
