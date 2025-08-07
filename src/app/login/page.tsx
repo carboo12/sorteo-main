@@ -60,6 +60,7 @@ export default function LoginPage() {
                 login(sessionUser); // Create local session
                 toast({ title: '¡Éxito!', description: 'Has iniciado sesión como Superusuario.' });
                 router.push('/dashboard');
+                setIsSubmitting(false);
                 return; // Stop execution after successful superuser login
             } else {
                 // Password does not match for superuser
