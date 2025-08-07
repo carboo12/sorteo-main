@@ -1,33 +1,22 @@
 
 import * as admin from 'firebase-admin';
 
-// --- Environment Variable-based Initialization ---
 let adminApp: admin.app.App | null = null;
 let initError: Error | null = null;
 
-const projectId = process.env.FIREBASE_PROJECT_ID;
-const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-// The private key needs to be parsed correctly, replacing escaped newlines.
-const privateKey = process.env.FIREBASE_PRIVATE_KEY
-  ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
-  : undefined;
+// The 'firebase-admin' package automatically detects the service account credentials
+// via the GOOGLE_APPLICATION_CREDENTIALS environment variable when deployed.
+// For local development, this variable should be set in the .env.local file or shell.
+// This simplifies initialization and avoids parsing issues with the private key.
 
-const hasEnvVars = projectId && clientEmail && privateKey;
-
-if (hasEnvVars && !admin.apps.length) {
+if (!admin.apps.length) {
     try {
-        adminApp = admin.initializeApp({
-            credential: admin.credential.cert({
-                projectId,
-                clientEmail,
-                privateKey,
-            }),
-        });
+        adminApp = admin.initializeApp();
     } catch (e: any) {
         console.error('Firebase Admin SDK Initialization Error:', e);
         initError = e;
     }
-} else if (admin.apps.length) {
+} else {
     adminApp = admin.app();
 }
 
@@ -40,12 +29,6 @@ export const adminAuth = adminApp ? adminApp.auth() : null;
  * @returns An object with ready status and a message.
  */
 export function isAdminReady(): { ready: boolean; message: string } {
-    if (!hasEnvVars) {
-        return {
-            ready: false,
-            message: 'Las variables de entorno de Firebase Admin no están configuradas. Por favor, revisa tu archivo .env.'
-        };
-    }
     if (initError) {
         return {
             ready: false,
@@ -55,7 +38,7 @@ export function isAdminReady(): { ready: boolean; message: string } {
     if (!adminApp || !adminFirestore) {
         return {
             ready: false,
-            message: 'El SDK de Admin no se pudo inicializar. Contacta al soporte.'
+            message: 'El SDK de Admin no se pudo inicializar. Asegúrate de que las credenciales de la aplicación (GOOGLE_APPLICATION_CREDENTIALS) estén configuradas.'
         };
     }
     return { ready: true, message: 'SDK de Admin listo.' };
