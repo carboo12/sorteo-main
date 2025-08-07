@@ -20,44 +20,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // This function handles changes from Firebase Auth, but it will NOT log out a superuser.
   const handleAuthStateChange = useCallback(async (firebaseUser: FirebaseUser | null) => {
     if (firebaseUser) {
-      // User is signed in with Firebase.
-      // Now, get or create their profile from our backend (Firestore) using a server action.
+      // A normal user is signed in via Firebase. Get their profile.
       try {
         const appUser = await getOrCreateUser(firebaseUser.uid, firebaseUser.email);
-        
         if (appUser) {
-            localLogin(appUser); // Sync with localStorage for client-side state
+            localLogin(appUser); // Sync with localStorage
             setUser(appUser);
         } else {
-            // This case might happen if getOrCreateUser fails
-            await auth.signOut(); // Log out the user to prevent an inconsistent state
+            await auth.signOut(); // Log out if profile doesn't exist to prevent errors
         }
       } catch (error) {
-        console.error("Error syncing user profile with server action:", error);
+        console.error("Error syncing user profile:", error);
         await auth.signOut(); // Log out on error
       }
     } else {
-      // User is signed out.
-      localSignOut(); // Clear localStorage
-      setUser(null);
+      // Firebase says no user is signed in.
+      // We only clear the user IF it's NOT a superuser.
+      setUser(currentUser => {
+        if (currentUser?.role === 'superuser') {
+          return currentUser; // Keep the superuser session active.
+        }
+        localSignOut(); // Clear localStorage for normal users.
+        return null;
+      });
     }
     setLoading(false);
   }, []);
 
   useEffect(() => {
-    // Initial sync from localStorage for fast UI rendering
+    // 1. Initial sync from localStorage. This is crucial for the superuser.
     const currentUser = getCurrentUser();
     if (currentUser) {
       setUser(currentUser);
     }
-    setLoading(true); // Set loading to true until auth state is confirmed
+    setLoading(true);
 
-    // Subscribe to Firebase auth state changes
+    // 2. Subscribe to Firebase auth state changes for normal users.
     const unsubscribe = onAuthStateChanged(auth, handleAuthStateChange);
 
-    // Sync across tabs
+    // 3. Sync across tabs.
     const handleStorageChange = () => {
         const updatedUser = getCurrentUser();
         setUser(updatedUser);
@@ -71,7 +75,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [handleAuthStateChange]);
 
   const signOut = async () => {
-    await auth.signOut(); // This will trigger onAuthStateChanged and clear everything.
+    // This will sign out both Firebase users and the local superuser.
+    await auth.signOut(); // Triggers onAuthStateChanged which will clear normal users.
+    localSignOut(); // Explicitly clear localStorage for the superuser.
+    setUser(null);
   };
 
   return (

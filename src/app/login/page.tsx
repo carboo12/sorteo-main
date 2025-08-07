@@ -41,22 +41,22 @@ export default function LoginPage() {
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
     try {
-        // Hardcoded Superuser Check
+        // --- SUPERUSER HARDCODED CHECK (PRIORITY #1) ---
         if (values.username.toLowerCase() === 'admin' && values.password === '123456') {
             const superUser: AppUser = {
-                uid: 'hardcoded_superuser_id',
+                uid: 'superuser_local_id',
                 email: 'admin@sorteo.xpress',
                 name: 'admin',
                 role: 'superuser',
                 businessId: null,
             };
-            login(superUser);
+            login(superUser); // This saves to localStorage
             toast({ title: '¡Éxito!', description: 'Has iniciado sesión como superusuario.' });
             router.push('/dashboard');
-            return;
+            return; // Stop execution here
         }
 
-        // Normal User Authentication
+        // --- NORMAL USER AUTHENTICATION (FALLBACK) ---
         const userQuery = query(collection(db, "users"), where("name", "==", values.username));
         const userSnapshot = await getDocs(userQuery);
 
@@ -70,6 +70,7 @@ export default function LoginPage() {
              throw new Error("El usuario no tiene un email asociado.");
         }
         
+        // Use Firebase Auth for normal users
         await signInWithEmailAndPassword(auth, userEmail, values.password);
       
         toast({ title: '¡Éxito!', description: 'Has iniciado sesión correctamente.' });
