@@ -39,26 +39,29 @@ export default function LoginPage() {
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
     try {
-        // Check for superuser in 'masterusers' collection
-        const masterQuery = query(collection(db, "masterusers"), where("nombre", "==", values.username));
+        // 1. Check for Superuser in 'masteruser' collection
+        const masterQuery = query(collection(db, "masteruser"), where("nombre", "==", values.username));
         const masterSnapshot = await getDocs(masterQuery);
         
         if (!masterSnapshot.empty) {
             const masterDoc = masterSnapshot.docs[0];
             const masterData = masterDoc.data();
-            if (masterData.password === values.password) {
+            
+            // 1.1 Check password
+            if (masterData.contraseña === values.password) {
+                 // Use the email from the superuser document to sign in with Firebase Auth
                  await signInWithEmailAndPassword(auth, masterData.email, values.password);
                  toast({ title: '¡Éxito!', description: 'Has iniciado sesión como Superusuario.' });
                  router.push('/dashboard');
-                 router.refresh();
-                 return;
+                 router.refresh(); // Refresh to update server-side session state
+                 return; // Stop execution after successful superuser login
             } else {
-                // If masteruser exists but password is wrong, stop here.
+                // If masteruser exists but password is wrong, show error and stop.
                 throw new Error("Contraseña de superusuario incorrecta.");
             }
         }
         
-        // If not superuser, check regular 'users' collection
+        // 2. If not superuser, check regular 'users' collection
         const userQuery = query(collection(db, "users"), where("name", "==", values.username));
         const userSnapshot = await getDocs(userQuery);
 
@@ -74,17 +77,19 @@ export default function LoginPage() {
             throw new Error("El usuario no tiene un correo electrónico configurado para iniciar sesión.");
         }
 
+        // 3. Sign in regular user with Firebase Auth
         await signInWithEmailAndPassword(auth, userEmail, values.password);
 
         toast({ title: '¡Éxito!', description: 'Has iniciado sesión correctamente.' });
         router.push('/dashboard');
-        router.refresh();
+        router.refresh(); // Refresh to update server-side session state
 
     } catch (error: any) {
-        let errorMessage = 'Usuario o contraseña incorrectos.';
+        let errorMessage = 'Ocurrió un error inesperado.';
         if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
-            errorMessage = 'La contraseña es incorrecta para el usuario. Por favor, inténtalo de nuevo.';
+            errorMessage = 'Usuario o contraseña incorrectos. Por favor, inténtalo de nuevo.';
         } else if (error.message) {
+            // Use specific messages for custom errors
             errorMessage = error.message;
         }
         toast({
