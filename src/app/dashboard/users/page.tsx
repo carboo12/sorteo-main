@@ -1,12 +1,62 @@
-
 'use client';
 
+import { useEffect, useState } from 'react';
 import DashboardLayout from '@/components/dashboard-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { PlusCircle, User } from 'lucide-react';
+import { PlusCircle, User, Loader2 } from 'lucide-react';
+import { useAuth } from '@/hooks/use-auth';
+import { getUsers, getBusinesses } from '@/lib/actions';
+import type { AppUser, Business } from '@/lib/types';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { UserForm } from '@/components/user-form';
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 export default function UsersPage() {
+  const { user, loading: authLoading } = useAuth();
+  const [users, setUsers] = useState<AppUser[]>([]);
+  const [businesses, setBusinesses] = useState<Business[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  const fetchData = async () => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      const [fetchedUsers, fetchedBusinesses] = await Promise.all([
+          getUsers(),
+          user.role === 'superuser' ? getBusinesses() : Promise.resolve([])
+      ]);
+      setUsers(fetchedUsers);
+      setBusinesses(fetchedBusinesses);
+    } catch (error) {
+      console.error("Failed to fetch data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!authLoading) {
+      fetchData();
+    }
+  }, [user, authLoading]);
+
+  const onUserCreated = () => {
+    fetchData(); // Re-fetch users when a new one is created
+    setIsDialogOpen(false); // Close the dialog
+  }
+
+  if (authLoading || loading) {
+    return (
+        <DashboardLayout>
+            <div className="flex justify-center items-center h-full">
+                <Loader2 className="h-16 w-16 animate-spin text-primary" />
+            </div>
+        </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout>
       <div className="flex-1 space-y-4 p-8 pt-6">
@@ -18,10 +68,20 @@ export default function UsersPage() {
             </p>
           </div>
           <div className="flex items-center space-x-2">
-            <Button>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Crear Usuario
-            </Button>
+             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogTrigger asChild>
+                    <Button>
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Crear Usuario
+                    </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle>Crear Nuevo Usuario</DialogTitle>
+                    </DialogHeader>
+                    <UserForm businesses={businesses} onUserCreated={onUserCreated} creatorId={user?.uid ?? null} />
+                </DialogContent>
+            </Dialog>
           </div>
         </div>
         <Card>
@@ -32,13 +92,36 @@ export default function UsersPage() {
              </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-lg">
-                <User className="h-16 w-16 text-muted-foreground mb-4" />
-                <h3 className="text-xl font-semibold">No hay usuarios</h3>
-                <p className="text-muted-foreground">
-                    Crea un nuevo usuario para empezar.
-                </p>
-            </div>
+            {users.length === 0 ? (
+                 <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-lg">
+                    <User className="h-16 w-16 text-muted-foreground mb-4" />
+                    <h3 className="text-xl font-semibold">No hay usuarios</h3>
+                    <p className="text-muted-foreground">
+                        Crea un nuevo usuario para empezar.
+                    </p>
+                </div>
+            ) : (
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Nombre</TableHead>
+                            <TableHead>Email</TableHead>
+                            <TableHead>Rol</TableHead>
+                            <TableHead>Negocio</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {users.map((u) => (
+                            <TableRow key={u.uid}>
+                                <TableCell>{u.name}</TableCell>
+                                <TableCell>{u.email}</TableCell>
+                                <TableCell>{u.role}</TableCell>
+                                <TableCell>{businesses.find(b => b.id === u.businessId)?.name || 'N/A'}</TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            )}
           </CardContent>
         </Card>
       </div>

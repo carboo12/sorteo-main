@@ -3,7 +3,7 @@
 
 import './firebase-admin-sdk'; // <-- Ensure Admin SDK is initialized
 import { adminFirestore, adminAuth } from './firebase-admin-sdk';
-import type { AppUser, Business, Ticket, TurnoData, TurnoInfo, Winner } from './types';
+import type { AppUser, Business, Ticket, TurnoData, TurnoInfo, Winner, UserFormData } from './types';
 import { selectWinningNumber } from '@/ai/flows/select-winning-number';
 import * as admin from 'firebase-admin';
 
@@ -61,6 +61,7 @@ export async function getOrCreateUser(uid: string, email: string | null): Promis
             name: oldUserData.name || 'Usuario', // Use existing name
             role: oldUserData.role || 'seller', // Use existing role
             businessId: oldUserData.businessId || null, // Critical: Use existing businessId
+            createdBy: oldUserData.createdBy || null,
         };
         
         // Set the new user document with the correct Firebase Auth UID as the ID
@@ -100,6 +101,54 @@ export async function getBusinesses(): Promise<Business[]> {
     } catch (error) {
         console.error("Error fetching businesses:", error);
         return [];
+    }
+}
+
+export async function getUsers(): Promise<AppUser[]> {
+    try {
+        const snapshot = await adminFirestore.collection('users').get();
+        if (snapshot.empty) {
+            return [];
+        }
+        return snapshot.docs.map(doc => doc.data() as AppUser);
+    } catch (error) {
+        console.error("Error fetching users:", error);
+        return [];
+    }
+}
+
+
+export async function createUser(userData: UserFormData): Promise<{ success: boolean; message: string; }> {
+    try {
+        // 1. Create user in Firebase Auth
+        const userRecord = await adminAuth.createUser({
+            email: userData.email,
+            password: userData.password,
+            displayName: userData.name,
+            disabled: false,
+        });
+
+        // 2. Create user document in Firestore
+        const userRef = adminFirestore.collection('users').doc(userRecord.uid);
+        const appUser: AppUser = {
+            uid: userRecord.uid,
+            name: userData.name,
+            email: userData.email,
+            role: userData.role,
+            businessId: userData.businessId,
+            createdBy: userData.createdBy,
+        };
+        await userRef.set(appUser);
+
+        return { success: true, message: 'Usuario creado con éxito.' };
+
+    } catch (error: any) {
+        console.error("Error creating user:", error);
+        let message = 'Ocurrió un error al crear el usuario.';
+        if (error.code === 'auth/email-already-exists') {
+            message = 'El correo electrónico ya está en uso por otro usuario.';
+        }
+        return { success: false, message: message };
     }
 }
 
