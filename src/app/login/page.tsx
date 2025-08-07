@@ -16,6 +16,7 @@ import { signInWithEmailAndPassword } from 'firebase/auth';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { Loader2, LogIn, Eye, EyeOff } from 'lucide-react';
 import type { AppUser } from '@/lib/types';
+import { login } from '@/lib/auth-client';
 
 const formSchema = z.object({
   username: z.string().min(1, 'El nombre de usuario es obligatorio.'),
@@ -47,26 +48,29 @@ export default function LoginPage() {
             const masterDoc = masterSnapshot.docs[0];
             const masterData = masterDoc.data();
             
-            // 1.1 Superuser found, get their email and use Firebase Auth
-            const superuserEmail = masterData.email;
-            if (!superuserEmail) {
-                throw new Error("El documento del superusuario no tiene un email configurado.");
+            // 1.1 Superuser found, compare password directly from Firestore
+            if (masterData.contraseña === values.password) {
+                // Password matches, log in the superuser without Firebase Auth
+                const sessionUser: AppUser = { 
+                    uid: masterDoc.id,
+                    name: masterData.nombre, 
+                    role: 'superuser', 
+                    email: masterData.email 
+                };
+                login(sessionUser); // Create local session
+                toast({ title: '¡Éxito!', description: 'Has iniciado sesión como Superusuario.' });
+                router.push('/dashboard');
+                router.refresh(); 
+                return; // Stop execution after successful superuser login
             }
-            
-            // 1.2 Sign in superuser with Firebase Auth
-            await signInWithEmailAndPassword(auth, superuserEmail, values.password);
-            
-            toast({ title: '¡Éxito!', description: 'Has iniciado sesión como Superusuario.' });
-            router.push('/dashboard');
-            router.refresh(); 
-            return; // Stop execution after successful superuser login
         }
         
-        // 2. If not superuser, check regular 'users' collection
+        // 2. If not superuser (or superuser password incorrect), check regular 'users' collection
         const userQuery = query(collection(db, "users"), where("name", "==", values.username));
         const userSnapshot = await getDocs(userQuery);
 
         if (userSnapshot.empty) {
+            // If user not found in both collections, throw error
             throw new Error("Usuario o contraseña incorrectos.");
         }
 
@@ -81,6 +85,7 @@ export default function LoginPage() {
         // 3. Sign in regular user with Firebase Auth
         await signInWithEmailAndPassword(auth, userEmail, values.password);
 
+        // onAuthStateChanged in useAuth hook will handle the rest
         toast({ title: '¡Éxito!', description: 'Has iniciado sesión correctamente.' });
         router.push('/dashboard');
         router.refresh();
