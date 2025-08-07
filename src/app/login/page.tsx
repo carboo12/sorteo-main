@@ -39,8 +39,8 @@ export default function LoginPage() {
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
     try {
-        // 1. Check for Superuser in 'masteruser' collection first
-        const masterQuery = query(collection(db, "masteruser"), where("nombre", "==", values.username));
+        // 1. Check for Superuser in 'masterusers' collection first
+        const masterQuery = query(collection(db, "masterusers"), where("nombre", "==", values.username));
         const masterSnapshot = await getDocs(masterQuery);
         
         if (!masterSnapshot.empty) {
