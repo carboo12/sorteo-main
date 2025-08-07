@@ -48,6 +48,7 @@ export interface Business {
     address: string;
     location?: Location;
     winnerHistory?: Winner[];
+    disabled?: boolean;
 }
 
 export interface UserFormData {

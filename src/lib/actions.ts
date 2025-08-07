@@ -35,61 +35,87 @@ export async function logError(context: string, error: any): Promise<void> {
 export async function getOrCreateUser(uid: string, email: string | null): Promise<AppUser | null> {
     const userRef = adminFirestore.collection('users').doc(uid);
     const userSnap = await userRef.get();
-  
+
+    let userData: AppUser | null = null;
+
     if (userSnap.exists) {
-        const user = userSnap.data() as AppUser;
-        // Check if the user is disabled in our system
-        if (user.disabled) {
-            // Optional: sign out from firebase auth client-side if needed, but returning null is key
+        userData = userSnap.data() as AppUser;
+    } else if (email) {
+        const preRegisteredQuery = adminFirestore.collection('users').where('email', '==', email);
+        const preRegisteredSnap = await preRegisteredQuery.get();
+
+        if (!preRegisteredSnap.empty) {
+            const oldUserDoc = preRegisteredSnap.docs[0];
+            const oldUserData = oldUserDoc.data();
+            
+            const newUserData: AppUser = {
+                uid,
+                email,
+                name: oldUserData.name || 'Usuario',
+                role: oldUserData.role || 'seller',
+                businessId: oldUserData.businessId || null,
+                createdBy: oldUserData.createdBy || null,
+                disabled: oldUserData.disabled || false,
+            };
+
+            await userRef.set(newUserData);
+            if (oldUserDoc.id !== uid) {
+                await oldUserDoc.ref.delete();
+            }
+            userData = newUserData;
+        }
+    }
+
+    if (!userData) {
+        // User does not exist at all and was not pre-registered.
+        return null;
+    }
+
+    // If user is disabled in Firestore, deny login.
+    if (userData.disabled) {
+        return null;
+    }
+
+    // If user is associated with a business, check the business status.
+    if (userData.businessId) {
+        const businessRef = adminFirestore.collection('businesses').doc(userData.businessId);
+        const businessSnap = await businessRef.get();
+
+        if (!businessSnap.exists) {
+            // Business does not exist, treat as invalid configuration.
+            return null; 
+        }
+
+        const businessData = businessSnap.data() as Business;
+
+        // Check if license is expired
+        const licenseExpiresAt = new Date(businessData.licenseExpiresAt);
+        const now = new Date();
+
+        if (licenseExpiresAt < now) {
+            // License is expired. Disable business if not already disabled.
+            if (!businessData.disabled) {
+                await businessRef.update({ disabled: true });
+            }
+             // Deny login because license is expired.
             return null;
         }
-      return user;
-    }
-  
-    if (!email) {
-      return null;
-    }
-  
-    // Check if the user is a pre-registered business user by email
-    const businessUserQuery = adminFirestore.collection('users').where('email', '==', email);
-    const businessUserSnapshot = await businessUserQuery.get();
-     
-    if (!businessUserSnapshot.empty) {
-        const oldUserDoc = businessUserSnapshot.docs[0];
-        const oldUserData = oldUserDoc.data();
-        const oldDocId = oldUserDoc.id;
 
-        // Create the definitive AppUser object with all data
-        const appUser: AppUser = {
-            uid,
-            email,
-            name: oldUserData.name || 'Usuario', // Use existing name
-            role: oldUserData.role || 'seller', // Use existing role
-            businessId: oldUserData.businessId || null, // Critical: Use existing businessId
-            createdBy: oldUserData.createdBy || null,
-            disabled: oldUserData.disabled || false,
-        };
-        
-        // Set the new user document with the correct Firebase Auth UID as the ID
-        await userRef.set(appUser);
-        
-        // Delete the old pre-registered document if its ID is different
-        if(oldDocId !== uid) {
-            await adminFirestore.collection('users').doc(oldDocId).delete();
+        // Check if business is manually disabled, even if license is valid
+        if (businessData.disabled) {
+            return null;
         }
-        
-        if (appUser.disabled) return null;
-        return appUser;
     }
-
-    // Fallback if user is not pre-registered (should not happen based on current logic)
-    throw new Error('El usuario no está pre-registrado. Contacta al administrador.');
+    
+    // All checks passed, return the user data.
+    return userData;
 }
 
 
 export async function createBusiness(businessData: Omit<Business, 'id'>): Promise<{ success: boolean; message: string; businessId?: string }> {
     try {
-        const businessRef = await adminFirestore.collection('businesses').add(businessData);
+        const dataWithStatus = { ...businessData, disabled: false };
+        const businessRef = await adminFirestore.collection('businesses').add(dataWithStatus);
         return { success: true, message: 'Negocio creado con éxito.', businessId: businessRef.id };
     } catch (error: any) {
         console.error("Error creating business:", error);
