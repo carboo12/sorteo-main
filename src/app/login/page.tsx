@@ -31,6 +31,7 @@ export default function LoginPage() {
   const router = useRouter();
 
   useEffect(() => {
+    // Redirige si ya hay un usuario en la sesión del cliente
     if (getCurrentUser()) {
       router.replace('/dashboard');
     }
@@ -38,22 +39,33 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (!username || !password) {
+        toast({
+            variant: "destructive",
+            title: "Campos Incompletos",
+            description: "Por favor, introduce tu nombre de usuario y contraseña.",
+        });
+        return;
+    }
     setIsSubmitting(true);
 
     try {
+        // Paso 1 & 2: Buscar usuario por nombre y obtener su email (Server Action)
         const result = await signInWithUsername(username, password);
 
         if (!result.success || !result.user || !result.user.email) {
-            // Throw an error with the message from the server action
+            // Si la Server Action falla (ej: usuario no encontrado, error de SDK Admin), muestra el mensaje.
             throw new Error(result.message || 'Usuario o contraseña incorrectos.');
         }
 
         const appUser = result.user;
         const userEmail = appUser.email;
 
+        // Paso 3: Autenticar en el cliente con email y contraseña
         const userCredential = await signInWithEmailAndPassword(auth, userEmail, password);
         const firebaseUser = userCredential.user;
         
+        // Si la autenticación de Firebase es exitosa, guardamos la sesión localmente
         login({
             uid: firebaseUser.uid,
             email: appUser.email,
@@ -63,16 +75,15 @@ export default function LoginPage() {
             businessId: appUser.businessId
         });
 
-        toast({ title: `¡Bienvenido, ${appUser.username}!`});
+        toast({ title: `¡Bienvenido, ${appUser.nombre}!`});
         router.push('/dashboard');
 
     } catch (error: any) {
         console.error("Error de inicio de sesión: ", error);
         
-        // Prioritize the custom error message from our server action
         let errorMessage = error.message;
 
-        // Fallback for generic Firebase auth errors
+        // Mapeo de errores de Firebase Auth a mensajes amigables
         if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
             errorMessage = "Usuario o contraseña incorrectos.";
         }
@@ -105,7 +116,7 @@ export default function LoginPage() {
                   placeholder="tu-usuario"
                   required
                   value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  onChange={(e) => setUsername(e.target.value.toLowerCase())} // Guardar en minúsculas
                   disabled={isSubmitting}
                 />
               </div>

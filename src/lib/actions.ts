@@ -16,7 +16,7 @@ import {
   where,
 } from 'firebase/firestore';
 import { firestore as clientFirestore } from './firebase'; 
-import { adminFirestore, adminAuth } from './firebase-admin-sdk';
+import { adminFirestore, adminAuth, isFirebaseAdminError } from './firebase-admin-sdk';
 import { Timestamp as AdminTimestamp } from 'firebase-admin/firestore';
 import { selectWinningNumber } from '@/ai/flows/select-winning-number';
 import type { TurnoData, Winner, Ticket, TurnoInfo, Business, Location, AppUser } from './types';
@@ -24,13 +24,20 @@ import type { TurnoData, Winner, Ticket, TurnoInfo, Business, Location, AppUser 
 const SUPERUSER_EMAIL = 'carboo12@gmail.com';
 
 export async function signInWithUsername(username: string, password: string): Promise<{ success: boolean; message: string; user?: AppUser }> {
+    if (isFirebaseAdminError) {
+        return { success: false, message: isFirebaseAdminError };
+    }
     if (!adminFirestore) {
-        return { success: false, message: "El servicio de autenticación del servidor no está disponible. Verifica las credenciales del servidor (service-account.json)." };
+        return { success: false, message: "El servicio de autenticación del servidor no está disponible. Contacta con soporte." };
     }
     
     try {
+        // Normalizar el nombre de usuario a minúsculas para una búsqueda sin distinción de mayúsculas/minúsculas
+        const normalizedUsername = username.toLowerCase();
+        
         const usersRef = adminFirestore.collection("users");
-        const userQuery = usersRef.where("nombre", "==", username);
+        // Realizar la consulta con el nombre de usuario normalizado
+        const userQuery = usersRef.where("username", "==", normalizedUsername);
         const userSnapshot = await userQuery.get();
 
         if (userSnapshot.empty) {
@@ -44,6 +51,7 @@ export async function signInWithUsername(username: string, password: string): Pr
             return { success: false, message: "La cuenta de usuario está mal configurada. Contacta con el administrador." };
         }
         
+        // Devolvemos el usuario completo, incluyendo el email, para que el cliente pueda autenticarse.
         return { success: true, message: "Usuario encontrado.", user: userData };
 
     } catch (error: any) {
@@ -151,8 +159,8 @@ export async function drawWinner(
    if (!businessId) {
     return { success: false, message: "Business ID no encontrado." };
   }
-  if (!adminFirestore) {
-    return { success: false, message: "El servicio de sorteos no está disponible. Verifica las credenciales del servidor." };
+  if (isFirebaseAdminError || !adminFirestore) {
+    return { success: false, message: isFirebaseAdminError || "El servicio de sorteos no está disponible." };
   }
    const raffleDocRef = doc(clientFirestore, 'businesses', businessId, 'raffles', date);
    const monthId = date.substring(0, 7); // YYYY-MM
@@ -264,8 +272,8 @@ export async function getWinnerHistory(businessId: string): Promise<Winner[]> {
 export async function createBusiness(
     data: Omit<Business, 'id' | 'createdAt'>
 ): Promise<{ success: boolean; message: string; businessId?: string }> {
-    if (!adminFirestore) {
-        return { success: false, message: "El servicio de creación de negocios no está disponible. Verifica las credenciales del servidor." };
+    if (isFirebaseAdminError || !adminFirestore) {
+        return { success: false, message: isFirebaseAdminError || "El servicio de creación de negocios no está disponible." };
     }
     try {
         const businessData = {
@@ -282,8 +290,8 @@ export async function createBusiness(
 }
 
 export async function getBusinesses(): Promise<Business[]> {
-    if (!adminFirestore) {
-        console.error("El servicio de negocios no está disponible. Verifica las credenciales del servidor.");
+    if (isFirebaseAdminError || !adminFirestore) {
+        console.error(isFirebaseAdminError || "El servicio de negocios no está disponible.");
         return [];
     }
     try {
@@ -309,8 +317,8 @@ export async function getBusinesses(): Promise<Business[]> {
 }
 
 export async function getOrCreateUser(uid: string, email: string | null): Promise<AppUser> {
-    if (!adminFirestore) {
-        throw new Error("El servicio de usuarios no está disponible. Verifica las credenciales del servidor.");
+    if (isFirebaseAdminError || !adminFirestore) {
+        throw new Error(isFirebaseAdminError || "El servicio de usuarios no está disponible.");
     }
     const userDocRef = adminFirestore.collection('users').doc(uid);
     
@@ -333,7 +341,7 @@ export async function getOrCreateUser(uid: string, email: string | null): Promis
                 uid,
                 email,
                 username: username,
-                nombre: username, // Adding 'nombre' field for consistency
+                nombre: username,
                 role,
             };
             await userDocRef.set({ ...newUser, createdAt: AdminTimestamp.now() });
