@@ -25,17 +25,15 @@ const SUPERUSER_EMAIL = 'carboo12@gmail.com';
 
 export async function signInWithUsername(username: string, password: string): Promise<{ success: boolean; message: string; user?: AppUser }> {
     if (!adminFirestore) {
-        return { success: false, message: "El servicio de autenticación del servidor no está disponible. Verifica las credenciales del servidor." };
+        return { success: false, message: "El servicio de autenticación del servidor no está disponible. Verifica las credenciales del servidor (service-account.json)." };
     }
     
     try {
         const usersRef = adminFirestore.collection("users");
-        // Firestore Admin SDK queries are case-sensitive. We query by lowercase username.
         const userQuery = usersRef.where("nombre", "==", username);
         const userSnapshot = await userQuery.get();
 
         if (userSnapshot.empty) {
-            // No user found with that username
             return { success: false, message: "Usuario o contraseña incorrectos." };
         }
 
@@ -46,16 +44,11 @@ export async function signInWithUsername(username: string, password: string): Pr
             return { success: false, message: "La cuenta de usuario está mal configurada. Contacta con el administrador." };
         }
         
-        // This is a workaround to validate the password using the client SDK's logic.
-        // It's not ideal, but it's a common pattern when you don't want to use custom tokens.
-        // We let the client-side sign-in do the actual password check.
-        // The server action's job is to find the email for a given username.
         return { success: true, message: "Usuario encontrado.", user: userData };
 
     } catch (error: any) {
         console.error("Error en signInWithUsername:", error);
-        // Don't expose detailed server errors to the client
-        return { success: false, message: "Ha ocurrido un error en el servidor." };
+        return { success: false, message: "Ha ocurrido un error en el servidor al intentar iniciar sesión." };
     }
 }
 

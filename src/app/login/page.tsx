@@ -41,21 +41,19 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
-        // 1. Find user by username using the server action to bypass client-side Firestore rules
         const result = await signInWithUsername(username, password);
 
         if (!result.success || !result.user || !result.user.email) {
+            // Throw an error with the message from the server action
             throw new Error(result.message || 'Usuario o contraseña incorrectos.');
         }
 
         const appUser = result.user;
         const userEmail = appUser.email;
 
-        // 2. Use the retrieved email and the provided password to sign in with Firebase Auth on the client.
         const userCredential = await signInWithEmailAndPassword(auth, userEmail, password);
         const firebaseUser = userCredential.user;
         
-        // 3. If login is successful, create the local session.
         login({
             uid: firebaseUser.uid,
             email: appUser.email,
@@ -70,12 +68,13 @@ export default function LoginPage() {
 
     } catch (error: any) {
         console.error("Error de inicio de sesión: ", error);
-        let errorMessage = "Credenciales inválidas. Por favor, inténtalo de nuevo.";
         
+        // Prioritize the custom error message from our server action
+        let errorMessage = error.message;
+
+        // Fallback for generic Firebase auth errors
         if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
             errorMessage = "Usuario o contraseña incorrectos.";
-        } else if (error.message && !error.code) { // Use custom error message from server action
-           errorMessage = error.message;
         }
 
         toast({
