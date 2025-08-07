@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { auth, db } from '@/lib/firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { Loader2, LogIn, Eye, EyeOff } from 'lucide-react';
 import type { AppUser } from '@/lib/types';
 import { logError } from '@/lib/actions';
@@ -41,46 +41,50 @@ export default function LoginPage() {
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
     try {
-        // Step 1: Check if it's a superuser from 'masterusers' collection
+        // Step 1: Attempt to authenticate as a superuser first.
         const masterQuery = query(collection(db, "masterusers"), where("nombre", "==", values.username));
         const masterSnapshot = await getDocs(masterQuery);
 
         if (!masterSnapshot.empty) {
-            const masterData = masterSnapshot.docs[0].data();
-            const masterDocId = masterSnapshot.docs[0].id;
-            
-            // Direct password check against Firestore field
-            if (masterData.contraseña === values.password) {
-                 const superUser: AppUser = {
-                    uid: masterDocId,
-                    email: masterData.email,
-                    name: masterData.nombre,
+            // Superuser found, now check password directly.
+            const masterUserDoc = masterSnapshot.docs[0];
+            const masterUserData = masterUserDoc.data();
+
+            if (masterUserData.contraseña === values.password) {
+                // Password matches, log in as superuser.
+                const superUser: AppUser = {
+                    uid: masterUserDoc.id,
+                    email: masterUserData.email,
+                    name: masterUserData.nombre,
                     role: 'superuser',
-                    businessId: null, 
+                    businessId: null,
                 };
-                login(superUser); // Use client-side login
+                login(superUser); // Use client-side login for superuser
                 toast({ title: '¡Éxito!', description: 'Has iniciado sesión como superusuario.' });
                 router.push('/dashboard');
-                return; // End of process for superuser
+                setIsSubmitting(false);
+                return; // IMPORTANT: Stop execution here.
             } else {
-                 throw new Error("Usuario o contraseña incorrectos."); // Password mismatch
+                // Superuser found, but password is wrong.
+                throw new Error("Usuario o contraseña incorrectos.");
             }
         }
 
-        // Step 2: If not a superuser, proceed with normal user authentication via Firebase Auth
-        let userEmail: string | null = null;
+        // Step 2: If not a superuser, proceed with normal user authentication.
         const userQuery = query(collection(db, "users"), where("name", "==", values.username));
         const userSnapshot = await getDocs(userQuery);
 
-        if (!userSnapshot.empty) {
-            userEmail = userSnapshot.docs[0].data().email as string;
-        }
-
-        if (!userEmail) {
+        if (userSnapshot.empty) {
             throw new Error("Usuario o contraseña incorrectos.");
         }
         
-        // This part is for regular users, using Firebase Auth
+        const userEmail = userSnapshot.docs[0].data().email as string;
+
+        if (!userEmail) {
+             throw new Error("El usuario no tiene un email asociado.");
+        }
+        
+        // Use Firebase Auth for regular users
         await signInWithEmailAndPassword(auth, userEmail, values.password);
       
         toast({ title: '¡Éxito!', description: 'Has iniciado sesión correctamente.' });
