@@ -13,10 +13,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { auth, db } from '@/lib/firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { Loader2, LogIn, Eye, EyeOff } from 'lucide-react';
 import type { AppUser } from '@/lib/types';
 import { logError } from '@/lib/actions';
+import { login } from '@/lib/auth-client';
 
 const formSchema = z.object({
   username: z.string().min(1, 'El nombre de usuario es obligatorio.'),
@@ -39,35 +40,47 @@ export default function LoginPage() {
 
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
-    let userFound: AppUser | null = null;
-    let userEmail: string | null = null;
-
     try {
-        // Step 1: Find the user in Firestore to get their email.
-        // This logic works for both 'users' and 'masterusers' if they share the 'name' field convention.
-        
-        // Try finding in 'users' collection first
-        let userQuery = query(collection(db, "users"), where("name", "==", values.username));
-        let userSnapshot = await getDocs(userQuery);
+        // Step 1: Check if it's a superuser from 'masterusers' collection
+        const masterQuery = query(collection(db, "masterusers"), where("nombre", "==", values.username));
+        const masterSnapshot = await getDocs(masterQuery);
 
-        if (!userSnapshot.empty) {
-            userFound = userSnapshot.docs[0].data() as AppUser;
-            userEmail = userFound.email;
-        } else {
-            // If not in 'users', check 'masterusers'
-            const masterQuery = query(collection(db, "masterusers"), where("nombre", "==", values.username));
-            const masterSnapshot = await getDocs(masterQuery);
-            if (!masterSnapshot.empty) {
-                const masterData = masterSnapshot.docs[0].data();
-                userEmail = masterData.email;
+        if (!masterSnapshot.empty) {
+            const masterData = masterSnapshot.docs[0].data();
+            const masterDocId = masterSnapshot.docs[0].id;
+            
+            // Direct password check against Firestore field
+            if (masterData.contraseña === values.password) {
+                 const superUser: AppUser = {
+                    uid: masterDocId,
+                    email: masterData.email,
+                    name: masterData.nombre,
+                    role: 'superuser',
+                    businessId: null, 
+                };
+                login(superUser); // Use client-side login
+                toast({ title: '¡Éxito!', description: 'Has iniciado sesión como superusuario.' });
+                router.push('/dashboard');
+                return; // End of process for superuser
+            } else {
+                 throw new Error("Usuario o contraseña incorrectos."); // Password mismatch
             }
         }
-        
-        if (!userEmail) {
-            throw new Error("Usuario no encontrado.");
+
+        // Step 2: If not a superuser, proceed with normal user authentication via Firebase Auth
+        let userEmail: string | null = null;
+        const userQuery = query(collection(db, "users"), where("name", "==", values.username));
+        const userSnapshot = await getDocs(userQuery);
+
+        if (!userSnapshot.empty) {
+            userEmail = userSnapshot.docs[0].data().email as string;
         }
 
-        // Step 2: Sign in with Firebase Auth using the retrieved email.
+        if (!userEmail) {
+            throw new Error("Usuario o contraseña incorrectos.");
+        }
+        
+        // This part is for regular users, using Firebase Auth
         await signInWithEmailAndPassword(auth, userEmail, values.password);
       
         toast({ title: '¡Éxito!', description: 'Has iniciado sesión correctamente.' });
@@ -75,23 +88,11 @@ export default function LoginPage() {
 
     } catch (error: any) {
         await logError(`Login attempt for user: ${values.username}`, error);
-
-        let errorMessage = 'Ocurrió un error inesperado.';
-        if (
-            error.code === 'auth/wrong-password' ||
-            error.code === 'auth/user-not-found' ||
-            error.code === 'auth/invalid-credential' ||
-            error.message === "Usuario no encontrado."
-        ) {
-            errorMessage = 'Usuario o contraseña incorrectos.';
-        } else if (error.message) {
-            errorMessage = error.message;
-        }
         
         toast({
             variant: 'destructive',
             title: 'Error al Iniciar Sesión',
-            description: errorMessage,
+            description: 'Usuario o contraseña incorrectos.',
         });
     } finally {
         setIsSubmitting(false);
