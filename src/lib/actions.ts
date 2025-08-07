@@ -8,10 +8,10 @@ import * as admin from 'firebase-admin';
 
 // Helper function to find a user in a specific collection by username
 async function findUserInCollection(collectionName: string, username: string): Promise<any | null> {
-    const normalizedUsername = username.toLowerCase();
+    // No longer normalizing username to lowercase. Search will be case-sensitive.
     const snapshot = await adminFirestore!
         .collection(collectionName)
-        .where('nombre', '==', normalizedUsername)
+        .where('nombre', '==', username)
         .limit(1)
         .get();
 
