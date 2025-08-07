@@ -41,32 +41,36 @@ export default function LoginPage() {
     setIsSubmitting(true);
     try {
         // --- SUPERUSER AUTHENTICATION LOGIC ---
-        if (values.username.toLowerCase() === 'admin') {
-            const masterQuery = query(collection(db, "masterusers"), where("nombre", "==", values.username.toLowerCase()));
-            const masterSnapshot = await getDocs(masterQuery);
+        // First, check if the user exists in the masterusers collection.
+        const masterQuery = query(collection(db, "masterusers"), where("nombre", "==", values.username));
+        const masterSnapshot = await getDocs(masterQuery);
+
+        if (!masterSnapshot.empty) {
+            // Master user found, now check password directly from Firestore.
+            const masterDoc = masterSnapshot.docs[0];
+            const masterData = masterDoc.data();
             
-            if (!masterSnapshot.empty) {
-                const masterDoc = masterSnapshot.docs[0];
-                const masterData = masterDoc.data();
-                
-                // Direct password comparison from Firestore
-                if (masterData.contraseña === values.password) {
-                    const sessionUser: AppUser = { 
-                        uid: masterDoc.id,
-                        name: masterData.nombre, 
-                        role: 'superuser', 
-                        email: masterData.email 
-                    };
-                    login(sessionUser); // Create local session
-                    toast({ title: '¡Éxito!', description: 'Has iniciado sesión como Superusuario.' });
-                    router.push('/dashboard');
-                    setIsSubmitting(false);
-                    return; // Stop execution here after successful superuser login
-                }
+            if (masterData.contraseña === values.password) {
+                // Password matches. Log in the superuser without Firebase Auth.
+                const sessionUser: AppUser = { 
+                    uid: masterDoc.id,
+                    name: masterData.nombre, 
+                    role: 'superuser', 
+                    email: masterData.email 
+                };
+                login(sessionUser); // Create local session
+                toast({ title: '¡Éxito!', description: 'Has iniciado sesión como Superusuario.' });
+                router.push('/dashboard');
+                // Stop execution here.
+                return; 
+            } else {
+                // User found, but password incorrect. Throw specific error and stop.
+                throw new Error("Usuario o contraseña incorrectos.");
             }
         }
         
         // --- REGULAR USER AUTHENTICATION LOGIC ---
+        // If the user was not found in masterusers, proceed with normal user authentication.
         const userQuery = query(collection(db, "users"), where("name", "==", values.username));
         const userSnapshot = await getDocs(userQuery);
 
