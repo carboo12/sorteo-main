@@ -28,9 +28,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const appUser = await getOrCreateUser(firebaseUser.uid, firebaseUser.email);
         
         if (appUser) {
-            const token = await firebaseUser.getIdToken();
-            // Set cookie for server-side authentication if needed
-            document.cookie = `firebaseIdToken=${token}; path=/; max-age=3600`;
             localLogin(appUser); // Sync with localStorage for client-side state
             setUser(appUser);
         } else {
@@ -43,7 +40,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } else {
       // User is signed out.
-      document.cookie = 'firebaseIdToken=; path=/; max-age=-1';
       localSignOut(); // Clear localStorage
       setUser(null);
     }

@@ -16,7 +16,6 @@ import { signInWithEmailAndPassword } from 'firebase/auth';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { Loader2, LogIn, Eye, EyeOff } from 'lucide-react';
 import type { AppUser } from '@/lib/types';
-import { login } from '@/lib/auth-client';
 import { logError } from '@/lib/actions';
 
 const formSchema = z.object({
@@ -41,52 +40,40 @@ export default function LoginPage() {
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
     try {
-      // --- SUPERUSER AUTHENTICATION LOGIC (NON-FIREBASE AUTH) ---
-      const masterQuery = query(collection(db, "masterusers"), where("nombre", "==", values.username));
-      const masterSnapshot = await getDocs(masterQuery);
-
-      if (!masterSnapshot.empty) {
-        const masterDoc = masterSnapshot.docs[0];
-        const masterData = masterDoc.data();
-
-        if (masterData.contraseña === values.password) {
-          // Password matches. Log in the superuser without Firebase Auth.
-          const sessionUser: AppUser = {
-            uid: masterDoc.id,
-            name: masterData.nombre,
-            role: 'superuser',
-            email: masterData.email,
-          };
-          login(sessionUser); // Create local session
-          toast({ title: '¡Éxito!', description: 'Has iniciado sesión como Superusuario.' });
-          router.push('/dashboard');
-          return; // Stop execution here.
-        } else {
-          // User found, but password incorrect. Throw specific error and stop.
-          throw new Error("Usuario o contraseña incorrectos.");
-        }
-      }
-
-      // --- REGULAR USER AUTHENTICATION LOGIC (FIREBASE AUTH) ---
-      // If the user was not found in masterusers, proceed with normal user authentication.
+      // UNIFIED AUTH LOGIC
+      // 1. Find user by username in 'users' collection to get their email.
       const userQuery = query(collection(db, "users"), where("name", "==", values.username));
       const userSnapshot = await getDocs(userQuery);
 
       if (userSnapshot.empty) {
-        throw new Error("Usuario o contraseña incorrectos.");
+        // As a fallback, check masterusers for the superuser, but still use Firebase Auth.
+        const masterQuery = query(collection(db, "masterusers"), where("nombre", "==", values.username));
+        const masterSnapshot = await getDocs(masterQuery);
+
+        if (masterSnapshot.empty) {
+            throw new Error("Usuario o contraseña incorrectos.");
+        }
+        
+        const masterData = masterSnapshot.docs[0].data();
+        if (!masterData.email) {
+            throw new Error("La cuenta de superusuario no tiene un email configurado para el inicio de sesión.");
+        }
+
+        // 2. Sign in with Firebase Auth using the retrieved email.
+        await signInWithEmailAndPassword(auth, masterData.email, values.password);
+
+      } else {
+        const userData = userSnapshot.docs[0].data() as AppUser;
+        const userEmail = userData.email;
+        
+        if (!userEmail) {
+          throw new Error("El usuario no tiene un correo electrónico configurado para iniciar sesión.");
+        }
+        
+        // 2. Sign in with Firebase Auth using the retrieved email.
+        await signInWithEmailAndPassword(auth, userEmail, values.password);
       }
-
-      const userDoc = userSnapshot.docs[0];
-      const userData = userDoc.data() as AppUser;
-      const userEmail = userData.email;
-
-      if (!userEmail) {
-        throw new Error("El usuario no tiene un correo electrónico configurado para iniciar sesión.");
-      }
-
-      // Sign in regular user with Firebase Auth
-      await signInWithEmailAndPassword(auth, userEmail, values.password);
-
+      
       toast({ title: '¡Éxito!', description: 'Has iniciado sesión correctamente.' });
       router.push('/dashboard');
 
