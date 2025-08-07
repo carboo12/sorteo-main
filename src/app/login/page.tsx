@@ -39,65 +39,62 @@ export default function LoginPage() {
 
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
+    let userFound: AppUser | null = null;
+    let userEmail: string | null = null;
+
     try {
-      // UNIFIED AUTH LOGIC
-      // 1. Find user by username in 'users' collection to get their email.
-      const userQuery = query(collection(db, "users"), where("name", "==", values.username));
-      const userSnapshot = await getDocs(userQuery);
-
-      if (userSnapshot.empty) {
-        // As a fallback, check masterusers for the superuser, but still use Firebase Auth.
-        const masterQuery = query(collection(db, "masterusers"), where("nombre", "==", values.username));
-        const masterSnapshot = await getDocs(masterQuery);
-
-        if (masterSnapshot.empty) {
-            throw new Error("Usuario o contraseña incorrectos.");
-        }
+        // Step 1: Find the user in Firestore to get their email.
+        // This logic works for both 'users' and 'masterusers' if they share the 'name' field convention.
         
-        const masterData = masterSnapshot.docs[0].data();
-        if (!masterData.email) {
-            throw new Error("La cuenta de superusuario no tiene un email configurado para el inicio de sesión.");
+        // Try finding in 'users' collection first
+        let userQuery = query(collection(db, "users"), where("name", "==", values.username));
+        let userSnapshot = await getDocs(userQuery);
+
+        if (!userSnapshot.empty) {
+            userFound = userSnapshot.docs[0].data() as AppUser;
+            userEmail = userFound.email;
+        } else {
+            // If not in 'users', check 'masterusers'
+            const masterQuery = query(collection(db, "masterusers"), where("nombre", "==", values.username));
+            const masterSnapshot = await getDocs(masterQuery);
+            if (!masterSnapshot.empty) {
+                const masterData = masterSnapshot.docs[0].data();
+                userEmail = masterData.email;
+            }
         }
-
-        // 2. Sign in with Firebase Auth using the retrieved email.
-        await signInWithEmailAndPassword(auth, masterData.email, values.password);
-
-      } else {
-        const userData = userSnapshot.docs[0].data() as AppUser;
-        const userEmail = userData.email;
         
         if (!userEmail) {
-          throw new Error("El usuario no tiene un correo electrónico configurado para iniciar sesión.");
+            throw new Error("Usuario no encontrado.");
         }
-        
-        // 2. Sign in with Firebase Auth using the retrieved email.
+
+        // Step 2: Sign in with Firebase Auth using the retrieved email.
         await signInWithEmailAndPassword(auth, userEmail, values.password);
-      }
       
-      toast({ title: '¡Éxito!', description: 'Has iniciado sesión correctamente.' });
-      router.push('/dashboard');
+        toast({ title: '¡Éxito!', description: 'Has iniciado sesión correctamente.' });
+        router.push('/dashboard');
 
     } catch (error: any) {
-      await logError(`Login attempt for user: ${values.username}`, error);
+        await logError(`Login attempt for user: ${values.username}`, error);
 
-      let errorMessage = 'Ocurrió un error inesperado.';
-      if (
-        error.code === 'auth/wrong-password' ||
-        error.code === 'auth/user-not-found' ||
-        error.code === 'auth/invalid-credential' ||
-        error.message === "Usuario o contraseña incorrectos."
-      ) {
-        errorMessage = 'Usuario o contraseña incorrectos.';
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      toast({
-        variant: 'destructive',
-        title: 'Error al Iniciar Sesión',
-        description: errorMessage,
-      });
+        let errorMessage = 'Ocurrió un error inesperado.';
+        if (
+            error.code === 'auth/wrong-password' ||
+            error.code === 'auth/user-not-found' ||
+            error.code === 'auth/invalid-credential' ||
+            error.message === "Usuario no encontrado."
+        ) {
+            errorMessage = 'Usuario o contraseña incorrectos.';
+        } else if (error.message) {
+            errorMessage = error.message;
+        }
+        
+        toast({
+            variant: 'destructive',
+            title: 'Error al Iniciar Sesión',
+            description: errorMessage,
+        });
     } finally {
-      setIsSubmitting(false);
+        setIsSubmitting(false);
     }
   };
 
