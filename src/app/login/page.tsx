@@ -41,52 +41,39 @@ export default function LoginPage() {
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
     try {
-        // Step 1: Attempt to authenticate as a superuser first.
-        const masterQuery = query(collection(db, "masterusers"), where("nombre", "==", values.username));
-        const masterSnapshot = await getDocs(masterQuery);
-
-        if (!masterSnapshot.empty) {
-            // Superuser found, now check password directly.
-            const masterUserDoc = masterSnapshot.docs[0];
-            const masterUserData = masterUserDoc.data();
-
-            if (masterUserData.contraseña === values.password) {
-                // Password matches, log in as superuser.
-                const superUser: AppUser = {
-                    uid: masterUserDoc.id,
-                    email: masterUserData.email,
-                    name: masterUserData.nombre,
-                    role: 'superuser',
-                    businessId: null,
-                };
-                login(superUser); // Use client-side login for superuser
-                toast({ title: '¡Éxito!', description: 'Has iniciado sesión como superusuario.' });
-                router.push('/dashboard');
-            } else {
-                // Superuser found, but password is wrong.
-                 throw new Error("Usuario o contraseña incorrectos.");
-            }
-        } else {
-            // Step 2: If not a superuser, proceed with normal user authentication.
-            const userQuery = query(collection(db, "users"), where("name", "==", values.username));
-            const userSnapshot = await getDocs(userQuery);
-
-            if (userSnapshot.empty) {
-                throw new Error("Usuario o contraseña incorrectos.");
-            }
-            
-            const userEmail = userSnapshot.docs[0].data().email as string;
-
-            if (!userEmail) {
-                 throw new Error("El usuario no tiene un email asociado.");
-            }
-            
-            // Use Firebase Auth for regular users
-            await signInWithEmailAndPassword(auth, userEmail, values.password);
-          
-            toast({ title: '¡Éxito!', description: 'Has iniciado sesión correctamente.' });
+        // Hardcoded Superuser Check
+        if (values.username.toLowerCase() === 'admin' && values.password === '123456') {
+            const superUser: AppUser = {
+                uid: 'hardcoded_superuser_id',
+                email: 'admin@sorteo.xpress',
+                name: 'admin',
+                role: 'superuser',
+                businessId: null,
+            };
+            login(superUser);
+            toast({ title: '¡Éxito!', description: 'Has iniciado sesión como superusuario.' });
             router.push('/dashboard');
+            return;
         }
+
+        // Normal User Authentication
+        const userQuery = query(collection(db, "users"), where("name", "==", values.username));
+        const userSnapshot = await getDocs(userQuery);
+
+        if (userSnapshot.empty) {
+            throw new Error("Usuario o contraseña incorrectos.");
+        }
+        
+        const userEmail = userSnapshot.docs[0].data().email as string;
+
+        if (!userEmail) {
+             throw new Error("El usuario no tiene un email asociado.");
+        }
+        
+        await signInWithEmailAndPassword(auth, userEmail, values.password);
+      
+        toast({ title: '¡Éxito!', description: 'Has iniciado sesión correctamente.' });
+        router.push('/dashboard');
 
     } catch (error: any) {
         await logError(`Login attempt for user: ${values.username}`, error);
