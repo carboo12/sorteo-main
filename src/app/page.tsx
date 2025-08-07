@@ -11,17 +11,17 @@ export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    if (loading) {
-      return; 
-    }
-
-    if (user) {
-      router.replace('/dashboard');
-    } else {
-      router.replace('/login');
+    // This effect will run when the auth state is resolved.
+    if (!loading) {
+      if (user) {
+        router.replace('/dashboard');
+      } else {
+        router.replace('/login');
+      }
     }
   }, [user, loading, router]);
 
+  // Render a loading spinner while the auth state is being determined.
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-background">
       <Loader2 className="h-16 w-16 animate-spin text-primary" />
