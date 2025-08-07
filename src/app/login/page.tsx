@@ -50,22 +50,23 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
-        // Paso 1 & 2: Buscar usuario por nombre y obtener su email (Server Action)
         const result = await signInWithUsername(username, password);
 
         if (!result.success || !result.user || !result.user.email) {
-            // Si la Server Action falla (ej: usuario no encontrado, error de SDK Admin), muestra el mensaje.
-            throw new Error(result.message || 'Usuario o contraseña incorrectos.');
+            toast({
+                variant: "destructive",
+                title: "Error de Inicio de Sesión",
+                description: result.message || 'Usuario o contraseña incorrectos.',
+            });
+            return;
         }
 
         const appUser = result.user;
         const userEmail = appUser.email;
 
-        // Paso 3: Autenticar en el cliente con email y contraseña
         const userCredential = await signInWithEmailAndPassword(auth, userEmail, password);
         const firebaseUser = userCredential.user;
         
-        // Si la autenticación de Firebase es exitosa, guardamos la sesión localmente
         login({
             uid: firebaseUser.uid,
             email: appUser.email,
@@ -81,7 +82,10 @@ export default function LoginPage() {
     } catch (error: any) {
         console.error("Error de inicio de sesión: ", error);
         
-        let errorMessage = error.message;
+        let errorMessage = "Ocurrió un error inesperado.";
+        if (error.message) {
+            errorMessage = error.message;
+        }
 
         // Mapeo de errores de Firebase Auth a mensajes amigables
         if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
