@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, FormEvent } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
@@ -20,7 +20,7 @@ import { login } from '@/lib/auth-client';
 
 const formSchema = z.object({
   username: z.string().min(1, 'El nombre de usuario es obligatorio.'),
-  password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres.'),
+  password: z.string().min(1, 'La contraseña es obligatoria.'),
 });
 
 export default function LoginPage() {
@@ -50,7 +50,6 @@ export default function LoginPage() {
             
             // Superuser found, compare password directly from Firestore
             if (masterData.contraseña === values.password) {
-                // Password matches, log in the superuser without Firebase Auth
                 const sessionUser: AppUser = { 
                     uid: masterDoc.id,
                     name: masterData.nombre, 
@@ -60,7 +59,6 @@ export default function LoginPage() {
                 login(sessionUser); // Create local session
                 toast({ title: '¡Éxito!', description: 'Has iniciado sesión como Superusuario.' });
                 router.push('/dashboard');
-                setIsSubmitting(false);
                 return; // Stop execution after successful superuser login
             } else {
                 // Password does not match for superuser
@@ -95,7 +93,7 @@ export default function LoginPage() {
     } catch (error: any) {
         let errorMessage = 'Ocurrió un error inesperado.';
         if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
-            errorMessage = 'Usuario o contraseña incorrectos. Por favor, inténtalo de nuevo.';
+            errorMessage = 'Usuario o contraseña incorrectos.';
         } else if (error.message) {
             errorMessage = error.message;
         }
