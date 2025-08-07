@@ -46,13 +46,15 @@ export default function LoginPage() {
         if (!masterSnapshot.empty) {
             const masterDoc = masterSnapshot.docs[0];
             const masterData = masterDoc.data();
-            // This is a simplified check, ideally password should not be stored in plain text
             if (masterData.password === values.password) {
                  await signInWithEmailAndPassword(auth, masterData.email, values.password);
                  toast({ title: '¡Éxito!', description: 'Has iniciado sesión como Superusuario.' });
                  router.push('/dashboard');
                  router.refresh();
                  return;
+            } else {
+                // If masteruser exists but password is wrong, stop here.
+                throw new Error("Contraseña de superusuario incorrecta.");
             }
         }
         
@@ -81,7 +83,7 @@ export default function LoginPage() {
     } catch (error: any) {
         let errorMessage = 'Usuario o contraseña incorrectos.';
         if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
-            errorMessage = 'La contraseña es incorrecta. Por favor, inténtalo de nuevo.';
+            errorMessage = 'La contraseña es incorrecta para el usuario. Por favor, inténtalo de nuevo.';
         } else if (error.message) {
             errorMessage = error.message;
         }
