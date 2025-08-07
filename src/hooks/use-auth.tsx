@@ -20,64 +20,63 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // This function handles changes from Firebase Auth, but it will NOT log out a superuser.
-  const handleAuthStateChange = useCallback(async (firebaseUser: FirebaseUser | null) => {
-    if (firebaseUser) {
-      // A normal user is signed in via Firebase. Get their profile.
-      try {
-        const appUser = await getOrCreateUser(firebaseUser.uid, firebaseUser.email);
-        if (appUser) {
-            localLogin(appUser); // Sync with localStorage
-            setUser(appUser);
-        } else {
-            await auth.signOut(); // Log out if profile doesn't exist to prevent errors
-        }
-      } catch (error) {
-        console.error("Error syncing user profile:", error);
-        await auth.signOut(); // Log out on error
-      }
-    } else {
-      // Firebase says no user is signed in.
-      // We only clear the user IF it's NOT a superuser.
-      setUser(currentUser => {
-        if (currentUser?.role === 'superuser') {
-          return currentUser; // Keep the superuser session active.
-        }
-        localSignOut(); // Clear localStorage for normal users.
-        return null;
-      });
-    }
-    setLoading(false);
-  }, []);
-
   useEffect(() => {
-    // 1. Initial sync from localStorage. This is crucial for the superuser.
-    const currentUser = getCurrentUser();
-    if (currentUser) {
-      setUser(currentUser);
+    // Check for a local superuser first. This is the highest priority.
+    const localUser = getCurrentUser();
+    if (localUser?.role === 'superuser') {
+      setUser(localUser);
+      setLoading(false);
+      return; // Stop here if superuser is found. Do not subscribe to Firebase.
     }
-    setLoading(true);
 
-    // 2. Subscribe to Firebase auth state changes for normal users.
-    const unsubscribe = onAuthStateChanged(auth, handleAuthStateChange);
-
-    // 3. Sync across tabs.
+    // If not a superuser, proceed with Firebase auth for normal users.
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+      if (firebaseUser) {
+        try {
+          const appUser = await getOrCreateUser(firebaseUser.uid, firebaseUser.email);
+          if (appUser) {
+            localLogin(appUser); // Sync with localStorage for consistency
+            setUser(appUser);
+          } else {
+            // This case should ideally not happen if user creation is enforced
+            await auth.signOut();
+            setUser(null);
+          }
+        } catch (error) {
+          console.error("Error getting user profile, signing out:", error);
+          await auth.signOut();
+          setUser(null);
+        }
+      } else {
+        // No Firebase user is signed in.
+        localSignOut();
+        setUser(null);
+      }
+      setLoading(false);
+    });
+    
+    // Sync across tabs for logout/login events.
     const handleStorageChange = () => {
         const updatedUser = getCurrentUser();
         setUser(updatedUser);
+        // If the user logs out from another tab, firebase onAuthStateChanged will also fire.
+        // This handles logging in as superuser in another tab.
+        if (updatedUser?.role === 'superuser') {
+            window.location.reload(); // Reload to re-evaluate the auth logic.
+        }
     };
     window.addEventListener('storage', handleStorageChange);
+
 
     return () => {
         unsubscribe();
         window.removeEventListener('storage', handleStorageChange);
     };
-  }, [handleAuthStateChange]);
+  }, []);
 
   const signOut = async () => {
-    // This will sign out both Firebase users and the local superuser.
-    await auth.signOut(); // Triggers onAuthStateChanged which will clear normal users.
-    localSignOut(); // Explicitly clear localStorage for the superuser.
+    await auth.signOut(); // This will trigger onAuthStateChanged to clear Firebase users
+    localSignOut(); // Explicitly clear local storage for superuser
     setUser(null);
   };
 
