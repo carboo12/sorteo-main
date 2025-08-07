@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { auth, db } from '@/lib/firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { collection, query, where, getDocs, getFirestore } from 'firebase/firestore';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { Loader2, LogIn, Eye, EyeOff } from 'lucide-react';
 import type { AppUser } from '@/lib/types';
 
@@ -49,8 +49,13 @@ export default function LoginPage() {
             
             // 1.1 Check password
             if (masterData.contraseña === values.password) {
+                 // The superuser document in Firestore MUST have an "email" field
+                 const superuserEmail = masterData.email;
+                 if (!superuserEmail) {
+                    throw new Error("El documento del superusuario no tiene un email configurado.");
+                 }
                  // Use the email from the superuser document to sign in with Firebase Auth
-                 await signInWithEmailAndPassword(auth, masterData.email, values.password);
+                 await signInWithEmailAndPassword(auth, superuserEmail, values.password);
                  toast({ title: '¡Éxito!', description: 'Has iniciado sesión como Superusuario.' });
                  router.push('/dashboard');
                  router.refresh(); // Refresh to update server-side session state
