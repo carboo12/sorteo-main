@@ -62,33 +62,31 @@ export default function LoginPage() {
                 login(superUser); // Use client-side login for superuser
                 toast({ title: '¡Éxito!', description: 'Has iniciado sesión como superusuario.' });
                 router.push('/dashboard');
-                setIsSubmitting(false);
-                return; // IMPORTANT: Stop execution here.
             } else {
                 // Superuser found, but password is wrong.
+                 throw new Error("Usuario o contraseña incorrectos.");
+            }
+        } else {
+            // Step 2: If not a superuser, proceed with normal user authentication.
+            const userQuery = query(collection(db, "users"), where("name", "==", values.username));
+            const userSnapshot = await getDocs(userQuery);
+
+            if (userSnapshot.empty) {
                 throw new Error("Usuario o contraseña incorrectos.");
             }
-        }
+            
+            const userEmail = userSnapshot.docs[0].data().email as string;
 
-        // Step 2: If not a superuser, proceed with normal user authentication.
-        const userQuery = query(collection(db, "users"), where("name", "==", values.username));
-        const userSnapshot = await getDocs(userQuery);
-
-        if (userSnapshot.empty) {
-            throw new Error("Usuario o contraseña incorrectos.");
+            if (!userEmail) {
+                 throw new Error("El usuario no tiene un email asociado.");
+            }
+            
+            // Use Firebase Auth for regular users
+            await signInWithEmailAndPassword(auth, userEmail, values.password);
+          
+            toast({ title: '¡Éxito!', description: 'Has iniciado sesión correctamente.' });
+            router.push('/dashboard');
         }
-        
-        const userEmail = userSnapshot.docs[0].data().email as string;
-
-        if (!userEmail) {
-             throw new Error("El usuario no tiene un email asociado.");
-        }
-        
-        // Use Firebase Auth for regular users
-        await signInWithEmailAndPassword(auth, userEmail, values.password);
-      
-        toast({ title: '¡Éxito!', description: 'Has iniciado sesión correctamente.' });
-        router.push('/dashboard');
 
     } catch (error: any) {
         await logError(`Login attempt for user: ${values.username}`, error);
