@@ -10,13 +10,9 @@ const serviceAccount = {
 };
 
 if (!admin.apps.length) {
-  try {
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount)
-    });
-  } catch (error: any) {
-    console.error('Error initializing Firebase Admin SDK:', error.stack);
-  }
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+  });
 }
 
 const adminFirestore = admin.firestore();
