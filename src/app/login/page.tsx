@@ -48,7 +48,7 @@ export default function LoginPage() {
             const masterDoc = masterSnapshot.docs[0];
             const masterData = masterDoc.data();
             
-            // 1.1 Superuser found, compare password directly from Firestore
+            // Superuser found, compare password directly from Firestore
             if (masterData.contraseña === values.password) {
                 // Password matches, log in the superuser without Firebase Auth
                 const sessionUser: AppUser = { 
@@ -60,12 +60,14 @@ export default function LoginPage() {
                 login(sessionUser); // Create local session
                 toast({ title: '¡Éxito!', description: 'Has iniciado sesión como Superusuario.' });
                 router.push('/dashboard');
-                router.refresh(); 
                 return; // Stop execution after successful superuser login
+            } else {
+                // Password does not match for superuser
+                throw new Error("Usuario o contraseña incorrectos.");
             }
         }
         
-        // 2. If not superuser (or superuser password incorrect), check regular 'users' collection
+        // 2. If not superuser, check regular 'users' collection
         const userQuery = query(collection(db, "users"), where("name", "==", values.username));
         const userSnapshot = await getDocs(userQuery);
 
@@ -88,7 +90,6 @@ export default function LoginPage() {
         // onAuthStateChanged in useAuth hook will handle the rest
         toast({ title: '¡Éxito!', description: 'Has iniciado sesión correctamente.' });
         router.push('/dashboard');
-        router.refresh();
 
     } catch (error: any) {
         let errorMessage = 'Ocurrió un error inesperado.';
