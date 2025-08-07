@@ -23,7 +23,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     // Check for a local superuser first. This is the highest priority.
     const localUser = getCurrentUser();
-    if (localUser?.role === 'superuser') {
+    if (localUser && (localUser.role === 'superuser' || localUser.uid === 'superuser_local_id')) {
       setUser(localUser);
       setLoading(false);
       return; // Stop here if superuser is found. Do not subscribe to Firebase.
@@ -38,7 +38,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             localLogin(appUser); // Sync with localStorage for consistency
             setUser(appUser);
           } else {
-            // This case should ideally not happen if user creation is enforced
             await auth.signOut();
             setUser(null);
           }
@@ -56,14 +55,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
     
     // Sync across tabs for logout/login events.
-    const handleStorageChange = () => {
-        const updatedUser = getCurrentUser();
-        // If the user logs out from another tab, firebase onAuthStateChanged will also fire.
-        // This handles logging in as superuser in another tab.
-        if (updatedUser?.role === 'superuser' && user?.uid !== updatedUser.uid) {
-            window.location.reload(); // Reload to re-evaluate the auth logic.
-        } else if (!updatedUser) {
-             setUser(null);
+    const handleStorageChange = (event: StorageEvent) => {
+        if (event.key === 'app_user') {
+            window.location.reload();
         }
     };
     window.addEventListener('storage', handleStorageChange);
@@ -79,10 +73,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await auth.signOut(); // This will trigger onAuthStateChanged to clear Firebase users
     localSignOut(); // Explicitly clear local storage for superuser
     setUser(null);
+    window.location.href = '/login'; // Force reload to ensure clean state
   };
 
+  const value = { user, loading, signOut };
+
   return (
-    <AuthContext.Provider value={{ user, loading, signOut }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

@@ -57,6 +57,28 @@ export default function LoginPage() {
         }
 
         // --- NORMAL USER AUTHENTICATION (FALLBACK) ---
+        // First, check masterusers collection as well
+        const masterUserQuery = query(collection(db, "masterusers"), where("nombre", "==", values.username));
+        const masterUserSnapshot = await getDocs(masterUserQuery);
+
+        if (!masterUserSnapshot.empty) {
+            const masterUserData = masterUserSnapshot.docs[0].data();
+            if (masterUserData.contraseña === values.password) {
+                 const masterUser: AppUser = {
+                    uid: masterUserSnapshot.docs[0].id,
+                    email: masterUserData.email || `${masterUserData.nombre}@sorteo.xpress`,
+                    name: masterUserData.nombre,
+                    role: 'superuser',
+                    businessId: null,
+                };
+                login(masterUser);
+                toast({ title: '¡Éxito!', description: 'Has iniciado sesión como superusuario.' });
+                router.push('/dashboard');
+                return;
+            }
+        }
+
+
         const userQuery = query(collection(db, "users"), where("name", "==", values.username));
         const userSnapshot = await getDocs(userQuery);
 
