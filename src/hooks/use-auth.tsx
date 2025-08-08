@@ -21,20 +21,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for a local user first. This is the highest priority.
     const localUser = getCurrentUser();
     if (localUser) {
-      setUser(localUser);
-      setLoading(false);
-      // If it's a superuser, we don't need to check firebase auth.
-      if (localUser.role === 'superuser') {
-        return;
-      }
+        setUser(localUser);
+        if (localUser.role === 'superuser') {
+            setLoading(false);
+            return;
+        }
     }
 
-    // If not a superuser or no local user, proceed with Firebase auth.
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
-      // Avoid overwriting a logged-in superuser with a null firebase user.
       const currentLocalUser = getCurrentUser();
       if (currentLocalUser && currentLocalUser.role === 'superuser') {
          setUser(currentLocalUser);
@@ -46,12 +42,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
           const appUser = await getOrCreateUser(firebaseUser.uid, firebaseUser.email);
           if (appUser) {
-            localLogin(appUser); // Sync with localStorage for consistency
+            localLogin(appUser);
             setUser(appUser);
           } else {
-            // User exists in Firebase Auth but not in our system or is disabled
-            await auth.signOut(); // Sign out from firebase
-            localSignOut(); // Sign out from local
+            await auth.signOut();
+            localSignOut();
             setUser(null);
           }
         } catch (error) {
@@ -61,21 +56,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUser(null);
         }
       } else {
-        // No Firebase user is signed in, ensure local is also cleared.
         localSignOut();
         setUser(null);
       }
       setLoading(false);
     });
     
-    // Sync across tabs for logout/login events.
     const handleStorageChange = (event: StorageEvent) => {
-        if (event.key === 'app_user' || event.key === null) { // key is null on clear
+        if (event.key === 'app_user' || event.key === null) {
             window.location.reload();
         }
     };
     window.addEventListener('storage', handleStorageChange);
-
 
     return () => {
         unsubscribe();
@@ -84,11 +76,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signOut = async () => {
-    // We must sign out from both, just in case
     await auth.signOut().catch(console.error); 
     localSignOut(); 
     setUser(null);
-    window.location.href = '/login'; // Force reload to ensure clean state
+    window.location.href = '/login';
   };
 
   const value = { user, loading, signOut };
