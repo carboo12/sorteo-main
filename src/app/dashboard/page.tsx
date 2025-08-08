@@ -25,17 +25,22 @@ export default function DashboardHomePage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (authLoading || user?.role === 'superuser') {
-      setLoading(false);
+    if (authLoading) {
+      // Still waiting for auth state to resolve
       return;
     }
 
+    if (user?.role === 'superuser') {
+        setLoading(false);
+        return;
+    }
+    
     const fetchStats = async () => {
       if (!user?.businessId) {
         setLoading(false);
         return;
       }
-        
+      
       setLoading(true);
       try {
         const { date } = getCurrentTurno();
@@ -109,16 +114,16 @@ export default function DashboardHomePage() {
   if (!user?.businessId) {
     return (
         <DashboardLayout>
-            <div className="flex justify-center items-center h-full p-8">
-                 <Card>
-                    <CardHeader>
+            <div className="flex-1 flex items-center justify-center p-8">
+                 <Card className="w-full max-w-md">
+                    <CardHeader className="text-center">
                         <CardTitle>Sin Asignación de Negocio</CardTitle>
                         <CardDescription>
                             No estás asignado a ningún negocio todavía.
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <p>Por favor, contacta al superusuario para que te asigne a un negocio y puedas empezar a operar.</p>
+                        <p className="text-center text-muted-foreground">Por favor, contacta al superusuario para que te asigne a un negocio y puedas empezar a operar.</p>
                     </CardContent>
                  </Card>
             </div>
