@@ -8,14 +8,29 @@ const USER_KEY = 'app_user';
 export function login(user: AppUser) {
   if (typeof window !== 'undefined') {
     localStorage.setItem(USER_KEY, JSON.stringify(user));
-    window.dispatchEvent(new Event('storage')); // Notify other tabs
+    // Dispatch a storage event to notify other tabs/windows
+    window.dispatchEvent(
+        new StorageEvent('storage', {
+            key: USER_KEY,
+            newValue: JSON.stringify(user),
+        })
+    );
   }
 }
 
 export function signOutUser() {
   if (typeof window !== 'undefined') {
+    const wasPresent = localStorage.getItem(USER_KEY);
     localStorage.removeItem(USER_KEY);
-    window.dispatchEvent(new Event('storage')); // Notify other tabs
+     // Dispatch a storage event to notify other tabs/windows
+     if (wasPresent) {
+        window.dispatchEvent(
+            new StorageEvent('storage', {
+                key: USER_KEY,
+                newValue: null,
+            })
+        );
+     }
   }
 }
 
