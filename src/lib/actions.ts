@@ -2,7 +2,7 @@
 'use server';
 
 import { adminFirestore, adminAuth, admin } from './firebase-admin-sdk';
-import type { AppUser, Business, Ticket, TurnoData, TurnoInfo, Winner, UserFormData } from './types';
+import type { AppUser, Business, Ticket, TurnoData, TurnoInfo, Winner, UserFormData, UserUpdateData } from './types';
 import { selectWinningNumber } from '@/ai/flows/select-winning-number';
 
 
@@ -184,9 +184,26 @@ export async function getUsers(requestingUser: AppUser): Promise<AppUser[]> {
     }
 }
 
+export async function getUserById(uid: string): Promise<AppUser | null> {
+    try {
+        const doc = await adminFirestore.collection('users').doc(uid).get();
+        if (!doc.exists) {
+            return null;
+        }
+        return doc.data() as AppUser;
+    } catch (error) {
+        console.error(`Error fetching user by ID (${uid}):`, error);
+        return null;
+    }
+}
+
 
 export async function createUser(userData: UserFormData, creator: AppUser): Promise<{ success: boolean; message: string; }> {
     try {
+        if (creator.role === 'seller') {
+            return { success: false, message: 'No tienes permiso para crear usuarios.' };
+        }
+        
         const businessIdToSet = creator.role === 'superuser' ? userData.businessId : creator.businessId;
 
         // 1. Create user in Firebase Auth
@@ -221,6 +238,70 @@ export async function createUser(userData: UserFormData, creator: AppUser): Prom
         return { success: false, message: message };
     }
 }
+
+export async function updateUser(uid: string, userData: UserUpdateData, editor: AppUser): Promise<{ success: boolean; message: string }> {
+    try {
+        const userToEdit = await getUserById(uid);
+        if (!userToEdit) {
+            return { success: false, message: 'El usuario que intentas editar no existe.' };
+        }
+
+        // Permission check
+        if (editor.role === 'seller') {
+            return { success: false, message: 'No tienes permiso para editar usuarios.' };
+        }
+        if (editor.role === 'admin') {
+            // Admins can't edit themselves, other admins, or users outside their business
+            if (uid === editor.uid || userToEdit.role === 'admin' || userToEdit.businessId !== editor.businessId) {
+                return { success: false, message: 'No tienes permiso para editar este usuario.' };
+            }
+        }
+        
+        const authUpdates: { email?: string; password?: string; displayName?: string } = {};
+        const firestoreUpdates: { [key: string]: any } = {};
+
+        if (userData.name && userData.name !== userToEdit.name) {
+            authUpdates.displayName = userData.name;
+            firestoreUpdates.name = userData.name;
+        }
+        if (userData.email && userData.email !== userToEdit.email) {
+            authUpdates.email = userData.email;
+            firestoreUpdates.email = userData.email;
+        }
+        if (userData.password) {
+            authUpdates.password = userData.password;
+        }
+
+        // Only superuser can change role and businessId
+        if (editor.role === 'superuser') {
+            if (userData.role && userData.role !== userToEdit.role) {
+                firestoreUpdates.role = userData.role;
+            }
+            if (userData.businessId !== userToEdit.businessId) {
+                firestoreUpdates.businessId = userData.businessId;
+            }
+        }
+        
+        // Apply updates
+        if (Object.keys(authUpdates).length > 0) {
+            await adminAuth.updateUser(uid, authUpdates);
+        }
+        if (Object.keys(firestoreUpdates).length > 0) {
+            await adminFirestore.collection('users').doc(uid).update(firestoreUpdates);
+        }
+
+        return { success: true, message: 'Usuario actualizado con éxito.' };
+
+    } catch (error: any) {
+        console.error(`Error updating user ${uid}:`, error);
+        let message = 'Ocurrió un error al actualizar el usuario.';
+        if (error.code === 'auth/email-already-exists') {
+            message = 'El correo electrónico ya está en uso por otro usuario.';
+        }
+        return { success: false, message: message };
+    }
+}
+
 
 export async function toggleUserStatus(uid: string, disabled: boolean): Promise<{ success: boolean, message: string }> {
     try {

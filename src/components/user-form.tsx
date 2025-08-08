@@ -5,34 +5,40 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { createUser } from "@/lib/actions";
-import type { Business, AppUser, UserFormData } from "@/lib/types";
+import { createUser, updateUser } from "@/lib/actions";
+import type { Business, AppUser } from "@/lib/types";
+import { useRouter } from "next/navigation";
+
 
 const formSchema = z.object({
   name: z.string().min(2, "El nombre es muy corto."),
   email: z.string().email("El correo no es válido."),
-  password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres."),
+  password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres.").optional().or(z.literal('')),
   role: z.enum(["admin", "seller"]),
   businessId: z.string().nullable(),
 });
 
 interface UserFormProps {
     businesses: Business[];
-    onUserCreated: () => void;
+    onUserSaved: () => void;
     creator: AppUser;
+    initialData?: AppUser | null;
 }
 
-export function UserForm({ businesses, onUserCreated, creator }: UserFormProps) {
+export function UserForm({ businesses, onUserSaved, creator, initialData }: UserFormProps) {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const { toast } = useToast();
+    const router = useRouter();
     
+    const isEditMode = !!initialData;
     const isSuperuser = creator.role === 'superuser';
+    const isAdminEditing = creator.role === 'admin';
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -44,19 +50,56 @@ export function UserForm({ businesses, onUserCreated, creator }: UserFormProps) 
             businessId: isSuperuser ? null : creator.businessId,
         },
     });
+    
+    useEffect(() => {
+        if (isEditMode && initialData) {
+            form.reset({
+                name: initialData.name,
+                email: initialData.email || '',
+                password: '',
+                role: initialData.role,
+                businessId: initialData.businessId,
+            });
+        }
+    }, [initialData, isEditMode, form]);
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
         if (!creator) {
             toast({ variant: "destructive", title: "Error", description: "No se pudo identificar al creador del usuario." });
             return;
         }
+
         setIsSubmitting(true);
         try {
-            const result = await createUser(values, creator);
+            let result;
+            if (isEditMode && initialData) {
+                 const updateData = {
+                    ...values,
+                    // Don't send an empty password to the update function
+                    password: values.password ? values.password : undefined,
+                 };
+                result = await updateUser(initialData.uid, updateData, creator);
+            } else {
+                 if (!values.password) {
+                    form.setError("password", { message: "La contraseña es obligatoria al crear un usuario." });
+                    setIsSubmitting(false);
+                    return;
+                }
+                const createData = {
+                    ...values,
+                    password: values.password,
+                };
+                result = await createUser(createData, creator);
+            }
+            
 
             if (result.success) {
                 toast({ title: "¡Éxito!", description: result.message });
-                onUserCreated();
+                onUserSaved();
+                if (isEditMode) {
+                    router.push('/dashboard/users');
+                    router.refresh();
+                }
             } else {
                 throw new Error(result.message);
             }
@@ -103,8 +146,9 @@ export function UserForm({ businesses, onUserCreated, creator }: UserFormProps) 
                         <FormItem>
                         <FormLabel>Contraseña</FormLabel>
                         <FormControl>
-                            <Input type="password" placeholder="••••••••" {...field} />
+                            <Input type="password" placeholder={isEditMode ? "Dejar en blanco para no cambiar" : "••••••••"} {...field} />
                         </FormControl>
+                        {isEditMode && <FormDescription>Deja este campo en blanco si no deseas cambiar la contraseña.</FormDescription>}
                         <FormMessage />
                         </FormItem>
                     )}
@@ -116,17 +160,18 @@ export function UserForm({ businesses, onUserCreated, creator }: UserFormProps) 
                         render={({ field }) => (
                             <FormItem>
                             <FormLabel>Rol</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <Select onValueChange={field.onChange} value={field.value} disabled={isAdminEditing}>
                                 <FormControl>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Selecciona un rol" />
                                 </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                <SelectItem value="admin">Administrador</SelectItem>
-                                <SelectItem value="seller">Vendedor</SelectItem>
+                                    <SelectItem value="admin">Administrador</SelectItem>
+                                    <SelectItem value="seller">Vendedor</SelectItem>
                                 </SelectContent>
                             </Select>
+                             {isAdminEditing && <FormDescription>Los administradores no pueden cambiar roles.</FormDescription>}
                             <FormMessage />
                             </FormItem>
                         )}
@@ -137,28 +182,34 @@ export function UserForm({ businesses, onUserCreated, creator }: UserFormProps) 
                         render={({ field }) => (
                             <FormItem>
                             <FormLabel>Negocio</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value ?? ""} disabled={!isSuperuser}>
+                            <Select onValueChange={field.onChange} value={field.value ?? ""} disabled={!isSuperuser}>
                                 <FormControl>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Asignar a un negocio" />
                                 </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                    {isSuperuser && <SelectItem value="null">Ninguno</SelectItem>}
-                                    {businesses.map(b => (
+                                    {isSuperuser && businesses.map(b => (
                                         <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
                                     ))}
+                                    {!isSuperuser && businesses.find(b => b.id === creator.businessId) &&
+                                        <SelectItem key={creator.businessId!} value={creator.businessId!}>
+                                            {businesses.find(b => b.id === creator.businessId)?.name}
+                                        </SelectItem>
+                                    }
                                 </SelectContent>
                             </Select>
+                            {!isSuperuser && <FormDescription>Asignado al negocio actual.</FormDescription>}
                             <FormMessage />
                             </FormItem>
                         )}
                     />
                 </div>
-                <div className="flex justify-end pt-4">
-                    <Button type="submit" disabled={isSubmitting}>
+                <div className="flex justify-end pt-4 gap-2">
+                     <Button type="button" variant="ghost" onClick={() => router.back()}>Cancelar</Button>
+                     <Button type="submit" disabled={isSubmitting}>
                         {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
-                        Crear Usuario
+                        {isEditMode ? 'Guardar Cambios' : 'Crear Usuario'}
                     </Button>
                 </div>
             </form>

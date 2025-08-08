@@ -21,9 +21,11 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { useRouter } from 'next/navigation';
 
 export default function UsersPage() {
   const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
   const [users, setUsers] = useState<AppUser[]>([]);
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,7 +38,8 @@ export default function UsersPage() {
     try {
       const [fetchedUsers, fetchedBusinesses] = await Promise.all([
           getUsers(user),
-          getBusinesses(user.role === 'admin' ? user.businessId : null)
+          // Superusers see all businesses, admins see only their own for the form
+          getBusinesses(user.role === 'superuser' ? null : user.businessId)
       ]);
       setUsers(fetchedUsers);
       setBusinesses(fetchedBusinesses);
@@ -53,9 +56,9 @@ export default function UsersPage() {
     }
   }, [user, authLoading]);
 
-  const onUserCreated = () => {
-    fetchData(); // Re-fetch users when a new one is created
-    setIsDialogOpen(false); // Close the dialog
+  const onUserSaved = () => {
+    fetchData(); 
+    setIsDialogOpen(false); 
   }
 
   const handleToggleStatus = async (uid: string, currentStatus: boolean | undefined) => {
@@ -68,6 +71,15 @@ export default function UsersPage() {
       toast({ variant: 'destructive', title: 'Error', description: result.message });
     }
   };
+
+  const canEdit = (userToEdit: AppUser): boolean => {
+      if (!user) return false;
+      if (user.role === 'superuser') return true;
+      if (user.role === 'admin') {
+          return userToEdit.role === 'seller' && userToEdit.businessId === user.businessId;
+      }
+      return false;
+  }
 
   if (authLoading || loading) {
     return (
@@ -101,7 +113,7 @@ export default function UsersPage() {
                     <DialogHeader>
                         <DialogTitle>Crear Nuevo Usuario</DialogTitle>
                     </DialogHeader>
-                    {user && <UserForm businesses={businesses} onUserCreated={onUserCreated} creator={user} />}
+                    {user && <UserForm businesses={businesses} onUserSaved={onUserSaved} creator={user} />}
                 </DialogContent>
             </Dialog>
           </div>
@@ -155,7 +167,10 @@ export default function UsersPage() {
                                           </Button>
                                       </DropdownMenuTrigger>
                                       <DropdownMenuContent align="end">
-                                          <DropdownMenuItem onClick={() => alert('Función de editar no implementada aún.')}>
+                                          <DropdownMenuItem 
+                                            onClick={() => router.push(`/dashboard/users/${u.uid}`)}
+                                            disabled={!canEdit(u)}
+                                          >
                                               <Pencil className="mr-2 h-4 w-4" />
                                               <span>Editar</span>
                                           </DropdownMenuItem>

@@ -58,3 +58,11 @@ export interface UserFormData {
     role: 'admin' | 'seller';
     businessId: string | null;
 }
+
+export interface UserUpdateData {
+    name?: string;
+    email?: string;
+    password?: string;
+    role?: 'admin' | 'seller';
+    businessId?: string | null;
+}
