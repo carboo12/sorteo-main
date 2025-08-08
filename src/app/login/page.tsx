@@ -88,7 +88,13 @@ export default function LoginPage() {
             throw new Error("Usuario o contraseña incorrectos.");
         }
         
-        const userEmail = userSnapshot.docs[0].data().email as string;
+        const userDoc = userSnapshot.docs[0].data() as AppUser;
+
+        if (userDoc.disabled) {
+            throw new Error("Tu cuenta ha sido inhabilitada. Contacta al administrador.");
+        }
+        
+        const userEmail = userDoc.email as string;
 
         if (!userEmail) {
              throw new Error("El usuario no tiene un email asociado.");
@@ -102,10 +108,14 @@ export default function LoginPage() {
     } catch (error: any) {
         await logError(`Login attempt for user: ${values.username}`, error);
         
+        const errorMessage = error.message === "Tu cuenta ha sido inhabilitada. Contacta al administrador."
+            ? error.message
+            : 'Usuario o contraseña incorrectos.';
+
         toast({
             variant: 'destructive',
             title: 'Error al Iniciar Sesión',
-            description: 'Usuario o contraseña incorrectos.',
+            description: errorMessage,
         });
     } finally {
         setIsSubmitting(false);

@@ -85,7 +85,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     // We must sign out from both, just in case
-    await auth.signOut(); 
+    await auth.signOut().catch(console.error); 
     localSignOut(); 
     setUser(null);
     window.location.href = '/login'; // Force reload to ensure clean state
