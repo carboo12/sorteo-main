@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { auth, db } from '@/lib/firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, DocumentData } from 'firebase/firestore';
 import { Loader2, LogIn, Eye, EyeOff } from 'lucide-react';
 import type { AppUser } from '@/lib/types';
 import { logError } from '@/lib/actions';
@@ -81,15 +81,28 @@ export default function LoginPage() {
         }
 
         // --- 3. NORMAL USER AUTHENTICATION (FALLBACK) ---
-        const userQuery = query(collection(db, "users"), where("name", "==", values.username));
-        const userSnapshot = await getDocs(userQuery);
+        // Try to find user by name first, then by email.
+        let userDoc: DocumentData | null = null;
 
-        if (userSnapshot.empty) {
+        // Query by name
+        const userByNameQuery = query(collection(db, "users"), where("name", "==", values.username));
+        const userByNameSnapshot = await getDocs(userByNameQuery);
+
+        if (!userByNameSnapshot.empty) {
+            userDoc = userByNameSnapshot.docs[0].data();
+        } else {
+            // If not found by name, query by email
+            const userByEmailQuery = query(collection(db, "users"), where("email", "==", values.username));
+            const userByEmailSnapshot = await getDocs(userByEmailQuery);
+            if (!userByEmailSnapshot.empty) {
+                userDoc = userByEmailSnapshot.docs[0].data();
+            }
+        }
+
+        if (!userDoc) {
             throw new Error("Usuario o contraseña incorrectos.");
         }
         
-        const userDoc = userSnapshot.docs[0].data() as AppUser;
-
         if (userDoc.disabled) {
             throw new Error("Tu cuenta ha sido inhabilitada. Contacta al administrador.");
         }
@@ -108,9 +121,13 @@ export default function LoginPage() {
     } catch (error: any) {
         await logError(`Login attempt for user: ${values.username}`, error);
         
-        const errorMessage = error.message === "Tu cuenta ha sido inhabilitada. Contacta al administrador."
-            ? error.message
-            : 'Usuario o contraseña incorrectos.';
+        let errorMessage = 'Usuario o contraseña incorrectos.';
+        if (error.code === 'auth/invalid-credential' || error.message.includes("incorrectos")) {
+             errorMessage = 'Usuario o contraseña incorrectos.';
+        } else if (error.message.includes("inhabilitada")) {
+             errorMessage = "Tu cuenta ha sido inhabilitada. Contacta al administrador.";
+        }
+
 
         toast({
             variant: 'destructive',
@@ -137,9 +154,9 @@ export default function LoginPage() {
                 name="username"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Nombre de Usuario</FormLabel>
+                    <FormLabel>Nombre de Usuario o Email</FormLabel>
                     <FormControl>
-                      <Input placeholder="tu-usuario" {...field} />
+                      <Input placeholder="tu-usuario o tu-email@ejemplo.com" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
