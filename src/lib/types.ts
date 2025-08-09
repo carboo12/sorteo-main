@@ -75,16 +75,23 @@ export interface UserUpdateData {
     businessId?: string | null;
 }
 
-export interface BusinessSettings {
-    id: string; 
+export interface FinancialSettings {
     exchangeRateUSDToNIO: number;
     ticketPrice: number;
-    turnos: {
+}
+
+export interface TurnosSettings {
+     turnos: {
         turno1: { enabled: boolean; drawTime: string; prize: string; };
         turno2: { enabled: boolean; drawTime: string; prize: string; };
         turno3: { enabled: boolean; drawTime: string; prize: string; };
     };
 }
+
+export interface BusinessSettings extends FinancialSettings, TurnosSettings {
+    id: string; 
+}
+
 
 export interface EventLog {
     id: string;
@@ -107,3 +114,5 @@ export interface ErrorLog {
     details?: string;
     businessId?: string | null;
 }
+
+    

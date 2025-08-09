@@ -3,7 +3,7 @@
 'use server';
 
 import { adminFirestore, adminAuth, admin } from './firebase-admin-sdk';
-import type { AppUser, Business, Ticket, TurnoData, TurnoInfo, Winner, UserFormData, UserUpdateData, BusinessSettings, EventLog } from './types';
+import type { AppUser, Business, Ticket, TurnoData, TurnoInfo, Winner, UserFormData, UserUpdateData, BusinessSettings, EventLog, FinancialSettings, TurnosSettings } from './types';
 
 
 export async function logError(context: string, error: any, businessId?: string | null): Promise<void> {
@@ -525,20 +525,32 @@ export async function getBusinessSettings(businessId: string): Promise<BusinessS
     }
 }
 
-export async function updateBusinessSettings(businessId: string, settings: Omit<BusinessSettings, 'id'>, editor: AppUser): Promise<{ success: boolean; message: string; }> {
+export async function updateBusinessFinancialSettings(businessId: string, settings: FinancialSettings, editor: AppUser): Promise<{ success: boolean; message: string; }> {
     try {
         const docRef = adminFirestore.collection('business_settings').doc(businessId);
         await docRef.set(settings, { merge: true });
-        
-        await logEvent(editor, 'update', 'settings', `Updated business settings`);
-
-        return { success: true, message: "Configuración guardada con éxito." };
+        await logEvent(editor, 'update', 'settings', `Updated financial settings.`);
+        return { success: true, message: "Configuración financiera guardada con éxito." };
     } catch (error: any) {
-        console.error("Error updating business settings:", error);
-        await logError(`updateBusinessSettings failed for business ${businessId}`, error, businessId);
+        console.error("Error updating financial settings:", error);
+        await logError(`updateBusinessFinancialSettings failed for business ${businessId}`, error, businessId);
         return { success: false, message: `Error al guardar la configuración: ${error.message}` };
     }
 }
+
+export async function updateBusinessTurnosSettings(businessId: string, settings: TurnosSettings, editor: AppUser): Promise<{ success: boolean; message: string; }> {
+    try {
+        const docRef = adminFirestore.collection('business_settings').doc(businessId);
+        await docRef.set(settings, { merge: true });
+        await logEvent(editor, 'update', 'settings', `Updated turnos settings.`);
+        return { success: true, message: "Configuración de turnos guardada con éxito." };
+    } catch (error: any) {
+        console.error("Error updating turnos settings:", error);
+        await logError(`updateBusinessTurnosSettings failed for business ${businessId}`, error, businessId);
+        return { success: false, message: `Error al guardar la configuración: ${error.message}` };
+    }
+}
+
 
 // Prize Claim Action
 export async function claimPrize(
@@ -591,3 +603,5 @@ export async function claimPrize(
         return { success: false, message: error.message };
     }
 }
+
+    
