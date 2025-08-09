@@ -20,7 +20,7 @@ import { Separator } from '@/components/ui/separator';
 
 const settingsSchema = z.object({
   exchangeRateUSDToNIO: z.coerce.number().positive({ message: "La tasa de cambio debe ser un número positivo." }),
-  ticketPrice: z.coerce.number().min(0, { message: "El precio del número no puede ser negativo." }),
+  ticketPrice: z.coerce.number().nonnegative({ message: "El precio del número no puede ser negativo." }),
   turnos: z.object({
     turno1: z.object({
       enabled: z.boolean(),
@@ -395,5 +395,3 @@ export default function SettingsPage() {
         </DashboardLayout>
     );
 }
-
-    
