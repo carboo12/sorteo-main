@@ -1,10 +1,9 @@
 
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { getCurrentUser, login as localLogin, signOutUser as localSignOut } from '@/lib/auth-client';
 import { getOrCreateUser } from '@/lib/actions';
 import type { AppUser } from '@/lib/types';
 
@@ -14,8 +13,6 @@ interface AuthContextType {
   signOut: () => void;
 }
 
-const USER_KEY = 'app_user';
-
 const AuthContext = createContext<AuthContextType>({ user: null, loading: true, signOut: () => {} });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -23,67 +20,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // This is the master listener. It determines the auth state.
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
-        // Check if a local user (especially superuser) exists.
-        const localUser = getCurrentUser();
-
-        // If firebase user exists, they are the source of truth (unless a superuser is logged in).
         if (firebaseUser) {
-             if (localUser?.role === 'superuser') {
-                setUser(localUser);
-            } else {
-                try {
-                    const appUser = await getOrCreateUser(firebaseUser.uid, firebaseUser.email);
-                    if (appUser) {
-                        localLogin(appUser); // Sync local storage
-                        setUser(appUser);
-                    } else {
-                        // User exists in Firebase but not in our DB or is disabled. Sign them out.
-                        await auth.signOut(); 
-                        setUser(null);
-                        localSignOut();
-                    }
-                } catch (error) {
-                    console.error("Error getting user profile, signing out:", error);
-                    await auth.signOut();
+            try {
+                // Fetch the full user profile from our database
+                const appUser = await getOrCreateUser(firebaseUser.uid, firebaseUser.email);
+
+                if (appUser) {
+                    // If user is found and not disabled, set them as the current user
+                    setUser(appUser);
+                } else {
+                    // User might be disabled or not exist in our DB. Sign them out from Firebase.
+                    await auth.signOut(); 
                     setUser(null);
-                    localSignOut();
                 }
+            } catch (error) {
+                console.error("Error getting user profile, signing out:", error);
+                await auth.signOut();
+                setUser(null);
             }
         } else {
-            // No firebase user. Is there a local superuser?
-             if (localUser?.role === 'superuser') {
-                setUser(localUser);
-            } else {
-                // No firebase user and no superuser. Clear everything.
-                setUser(null);
-                localSignOut();
-            }
+            // No Firebase user is signed in.
+            setUser(null);
         }
         setLoading(false);
     });
 
-    // Also handle changes from other tabs
-    const handleStorageChange = (event: StorageEvent) => {
-        if (event.key === USER_KEY) {
-            window.location.reload();
-        }
-    };
-    window.addEventListener('storage', handleStorageChange);
-
-
-    return () => {
-        unsubscribe();
-        window.removeEventListener('storage', handleStorageChange);
-    };
+    return () => unsubscribe();
   }, []);
 
   const signOut = async () => {
-    localSignOut();
-    await auth.signOut().catch(console.error); 
-    setUser(null);
-    window.location.href = '/login';
+    try {
+        await auth.signOut();
+    } catch (error) {
+        console.error("Error signing out:", error);
+    } finally {
+        setUser(null);
+        // Redirect to login to ensure clean state
+        window.location.href = '/login';
+    }
   };
 
   const value = { user, loading, signOut };

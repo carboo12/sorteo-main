@@ -34,22 +34,27 @@ export async function logError(context: string, error: any): Promise<void> {
 
 export async function getOrCreateUser(uid: string, email: string | null): Promise<AppUser | null> {
     const userRef = adminFirestore.collection('users').doc(uid);
-    const userSnap = await userRef.get();
-
+    let userSnap = await userRef.get();
     let userData: AppUser | null = null;
 
     if (userSnap.exists) {
         userData = userSnap.data() as AppUser;
     } else if (email) {
-        const preRegisteredQuery = adminFirestore.collection('users').where('email', '==', email);
-        const preRegisteredSnap = await preRegisteredQuery.get();
-
-        if (!preRegisteredSnap.empty) {
-            const oldUserDoc = preRegisteredSnap.docs[0];
+        // Check if a user with this email was pre-registered in 'users' collection
+        // This is common when an admin creates a user before they log in for the first time.
+        const userQuery = adminFirestore.collection('users').where('email', '==', email);
+        const querySnap = await userQuery.get();
+        
+        if (!querySnap.empty) {
+            // A pre-existing record was found for this email.
+            // This can happen if an admin created the user, which creates a Firestore doc
+            // but the UID was not known yet. Now we can consolidate them.
+            const oldUserDoc = querySnap.docs[0];
             const oldUserData = oldUserDoc.data();
             
+            // Create the definitive user data with the correct UID from Firebase Auth.
             const newUserData: AppUser = {
-                uid,
+                uid, // The real Firebase Auth UID
                 email,
                 name: oldUserData.name || 'Usuario',
                 role: oldUserData.role || 'seller',
@@ -58,56 +63,61 @@ export async function getOrCreateUser(uid: string, email: string | null): Promis
                 disabled: oldUserData.disabled || false,
             };
 
+            // Set the data under the correct UID document
             await userRef.set(newUserData);
+            
+            // If the old doc had a different, temporary ID, delete it to avoid duplicates.
             if (oldUserDoc.id !== uid) {
                 await oldUserDoc.ref.delete();
             }
+
             userData = newUserData;
         }
     }
 
     if (!userData) {
-        // User does not exist at all and was not pre-registered.
+        console.warn(`User with UID ${uid} not found in Firestore and could not be created.`);
         return null;
     }
+    
+    // Final checks before returning user data
 
-    // If user is disabled in Firestore, deny login.
+    // Check if user is disabled in Firestore
     if (userData.disabled) {
+        await logError('Login attempt by disabled user', { userId: uid });
         return null;
     }
 
-    // If user is associated with a business, check the business status.
+    // If user is associated with a business, check the business's status
     if (userData.businessId) {
-        const businessRef = adminFirestore.collection('businesses').doc(userData.businessId);
-        const businessSnap = await businessRef.get();
+        try {
+            const businessRef = adminFirestore.collection('businesses').doc(userData.businessId);
+            const businessSnap = await businessRef.get();
 
-        if (!businessSnap.exists) {
-            // Business does not exist, treat as invalid configuration.
-            return null; 
-        }
-
-        const businessData = businessSnap.data() as Business;
-
-        // Check if license is expired
-        const licenseExpiresAt = new Date(businessData.licenseExpiresAt);
-        const now = new Date();
-
-        if (licenseExpiresAt < now) {
-            // License is expired. Disable business if not already disabled.
-            if (!businessData.disabled) {
-                await businessRef.update({ disabled: true });
+            if (!businessSnap.exists) {
+                await logError('Login attempt by user with non-existent business', { userId: uid, businessId: userData.businessId });
+                return null; // Business does not exist
             }
-             // Deny login because license is expired.
-            return null;
-        }
 
-        // Check if business is manually disabled, even if license is valid
-        if (businessData.disabled) {
-            return null;
+            const businessData = businessSnap.data() as Business;
+            const now = new Date();
+            const licenseExpiresAt = new Date(businessData.licenseExpiresAt);
+
+            // Check if business is disabled or license is expired
+            if (businessData.disabled || licenseExpiresAt < now) {
+                if (licenseExpiresAt < now && !businessData.disabled) {
+                    // Automatically disable if license expired
+                    await businessRef.update({ disabled: true });
+                }
+                await logError('Login attempt for disabled or expired business', { userId: uid, businessId: userData.businessId });
+                return null;
+            }
+        } catch(e) {
+             await logError('Error checking business status during login', e);
+             return null;
         }
     }
     
-    // All checks passed, return the user data.
     return userData;
 }
 
