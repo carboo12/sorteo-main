@@ -113,7 +113,7 @@ export default function RaffleClient() {
     form.reset();
   };
 
-  const handleBuyTicket = async (values: z.infer<typeof buyTicketSchema>>) => {
+  const handleBuyTicket = async (values: z.infer<typeof buyTicketSchema>) => {
     if (!selectedNumber || !turnoInfo || !businessId || !user) return;
     setIsBuying(true);
     
@@ -402,3 +402,5 @@ export default function RaffleClient() {
     </div>
   );
 }
+
+    
