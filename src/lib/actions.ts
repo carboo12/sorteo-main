@@ -2,7 +2,7 @@
 'use server';
 
 import { adminFirestore, adminAuth, admin } from './firebase-admin-sdk';
-import type { AppUser, Business, Ticket, TurnoData, TurnoInfo, Winner, UserFormData, UserUpdateData, BusinessSettings } from './types';
+import type { AppUser, Business, Ticket, TurnoData, TurnoInfo, Winner, UserFormData, UserUpdateData, BusinessSettings, EventLog } from './types';
 
 
 export async function logError(context: string, error: any, businessId?: string | null): Promise<void> {
@@ -33,6 +33,62 @@ export async function logError(context: string, error: any, businessId?: string 
     }
 }
 
+// --- Event Logging ---
+export async function logEvent(
+    user: AppUser,
+    action: EventLog['action'],
+    entity: EventLog['entity'],
+    details: string,
+    targetBusinessId?: string | null
+): Promise<void> {
+    try {
+        const eventData: Omit<EventLog, 'id'> = {
+            timestamp: new Date().toISOString(),
+            userId: user.uid,
+            userName: user.name,
+            businessId: targetBusinessId === undefined ? user.businessId : targetBusinessId,
+            businessName: null, // Will be populated below if applicable
+            action,
+            entity,
+            details,
+        };
+
+        if (eventData.businessId) {
+            const business = await getBusinessById(eventData.businessId);
+            eventData.businessName = business?.name || null;
+        }
+
+        await adminFirestore.collection('event_logs').add(eventData);
+    } catch (e) {
+        console.error("Failed to log event:", e);
+        // Optional: log this failure to the error log itself
+        await logError("logEvent failed", e, user.businessId);
+    }
+}
+
+export async function getEventLogs(requestingUser: AppUser): Promise<EventLog[]> {
+    try {
+        let query: admin.firestore.Query = adminFirestore.collection('event_logs');
+
+        if (requestingUser.role === 'admin') {
+            if (!requestingUser.businessId) return [];
+            query = query.where('businessId', '==', requestingUser.businessId);
+        }
+        // Superuser gets all logs, so no businessId filter
+
+        const snapshot = await query.orderBy('timestamp', 'desc').limit(100).get();
+        if (snapshot.empty) {
+            return [];
+        }
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EventLog));
+
+    } catch (error) {
+        console.error("Error fetching event logs:", error);
+        await logError("getEventLogs failed", error, requestingUser.businessId);
+        return [];
+    }
+}
+
 
 export async function getOrCreateUser(uid: string, email: string | null): Promise<AppUser | null> {
     const userRef = adminFirestore.collection('users').doc(uid);
@@ -50,6 +106,7 @@ export async function getOrCreateUser(uid: string, email: string | null): Promis
                 businessId: null,
             };
             await userRef.set(superUserData);
+            await logEvent(superUserData, 'create', 'user', 'Superuser account auto-created.');
             return superUserData;
         }
         console.warn(`User with UID ${uid} not found in Firestore and is not superuser.`);
@@ -104,10 +161,13 @@ export async function getOrCreateUser(uid: string, email: string | null): Promis
 }
 
 
-export async function createBusiness(businessData: Omit<Business, 'id'>): Promise<{ success: boolean; message: string; businessId?: string }> {
+export async function createBusiness(businessData: Omit<Business, 'id'>, creator: AppUser): Promise<{ success: boolean; message: string; businessId?: string }> {
     try {
         const dataWithStatus = { ...businessData, disabled: false };
         const businessRef = await adminFirestore.collection('businesses').add(dataWithStatus);
+        
+        await logEvent(creator, 'create', 'business', `Created business '${businessData.name}'`);
+        
         return { success: true, message: 'Negocio creado con éxito.', businessId: businessRef.id };
     } catch (error: any) {
         console.error("Error creating business:", error);
@@ -115,9 +175,10 @@ export async function createBusiness(businessData: Omit<Business, 'id'>): Promis
     }
 }
 
-export async function updateBusiness(id: string, businessData: Omit<Business, 'id'>): Promise<{ success: boolean; message: string }> {
+export async function updateBusiness(id: string, businessData: Omit<Business, 'id'>, editor: AppUser): Promise<{ success: boolean; message: string }> {
     try {
         await adminFirestore.collection('businesses').doc(id).update(businessData);
+        await logEvent(editor, 'update', 'business', `Updated business '${businessData.name}' (ID: ${id})`, id);
         return { success: true, message: 'Negocio actualizado con éxito.' };
     } catch (error: any) {
         console.error("Error updating business:", error);
@@ -218,6 +279,9 @@ export async function createUser(userData: UserFormData, creator: AppUser): Prom
             disabled: false,
         };
         await userRef.set(appUser);
+        
+        await logEvent(creator, 'create', 'user', `Created user '${userData.name}' (${userData.email})`, businessIdToSet);
+
 
         return { success: true, message: 'Usuario creado con éxito.' };
 
@@ -281,6 +345,9 @@ export async function updateUser(uid: string, userData: UserUpdateData, editor: 
         if (Object.keys(firestoreUpdates).length > 0) {
             await adminFirestore.collection('users').doc(uid).update(firestoreUpdates);
         }
+        
+        await logEvent(editor, 'update', 'user', `Updated user '${userToEdit.name}' (UID: ${uid})`, userToEdit.businessId);
+
 
         return { success: true, message: 'Usuario actualizado con éxito.' };
 
@@ -295,8 +362,12 @@ export async function updateUser(uid: string, userData: UserUpdateData, editor: 
 }
 
 
-export async function toggleUserStatus(uid: string, disabled: boolean): Promise<{ success: boolean, message: string }> {
+export async function toggleUserStatus(uid: string, disabled: boolean, editor: AppUser): Promise<{ success: boolean, message: string }> {
     try {
+        const userToEdit = await getUserById(uid);
+        if (!userToEdit) {
+             return { success: false, message: 'Usuario no encontrado.' };
+        }
         // Update Firebase Auth state
         await adminAuth.updateUser(uid, { disabled });
 
@@ -305,6 +376,10 @@ export async function toggleUserStatus(uid: string, disabled: boolean): Promise<
         await userRef.update({ disabled });
         
         const action = disabled ? "inhabilitado" : "habilitado";
+        const actionVerb: EventLog['action'] = disabled ? 'delete' : 'update'; // Using 'delete' for disable semantically
+        
+        await logEvent(editor, actionVerb, 'user', `${disabled ? 'Disabled' : 'Enabled'} user '${userToEdit.name}' (UID: ${uid})`, userToEdit.businessId);
+
         return { success: true, message: `Usuario ${action} correctamente.` };
 
     } catch (error: any) {
@@ -327,7 +402,8 @@ export async function buyTicket(
   turnoInfo: TurnoInfo,
   number: number,
   name: string | null,
-  businessId: string
+  businessId: string,
+  buyer: AppUser,
 ): Promise<{ success: boolean; message: string }> {
     const docId = `${businessId}_${turnoInfo.date}_${turnoInfo.turno}`;
     const docRef = adminFirestore.collection('turnos').doc(docId);
@@ -348,13 +424,16 @@ export async function buyTicket(
             tickets.push(newTicket);
             transaction.set(docRef, { ...data, tickets }, { merge: true });
         });
+        
+        await logEvent(buyer, 'create', 'ticket', `Sold ticket #${number} for turno ${turnoInfo.key}`);
+
         return { success: true, message: `¡Número ${number} comprado con éxito!` };
     } catch (error: any) {
         return { success: false, message: error.message };
     }
 }
 
-export async function drawWinner(turnoInfo: TurnoInfo, businessId: string): Promise<{ success: boolean; message: string; winningNumber?: number }> {
+export async function drawWinner(turnoInfo: TurnoInfo, businessId: string, drawer: AppUser): Promise<{ success: boolean; message: string; winningNumber?: number }> {
   const docId = `${businessId}_${turnoInfo.date}_${turnoInfo.turno}`;
   const turnoRef = adminFirestore.collection('turnos').doc(docId);
   const businessRef = adminFirestore.collection('businesses').doc(businessId);
@@ -397,6 +476,9 @@ export async function drawWinner(turnoInfo: TurnoInfo, businessId: string): Prom
         winnerHistory: admin.firestore.FieldValue.arrayUnion(winnerHistoryEntry)
       });
     });
+    
+    await logEvent(drawer, 'create', 'raffle', `Drew winner #${winningNumber} for turno ${turnoInfo.key}`);
+
 
     return { success: true, winningNumber, message: `El número ganador es ${winningNumber}!` };
   } catch (error: any) {
@@ -443,10 +525,13 @@ export async function getBusinessSettings(businessId: string): Promise<BusinessS
     }
 }
 
-export async function updateBusinessSettings(businessId: string, settings: Omit<BusinessSettings, 'id'>): Promise<{ success: boolean; message: string; }> {
+export async function updateBusinessSettings(businessId: string, settings: Omit<BusinessSettings, 'id'>, editor: AppUser): Promise<{ success: boolean; message: string; }> {
     try {
         const docRef = adminFirestore.collection('business_settings').doc(businessId);
         await docRef.set(settings, { merge: true });
+        
+        await logEvent(editor, 'update', 'settings', `Updated business settings`);
+
         return { success: true, message: "Configuración guardada con éxito." };
     } catch (error: any) {
         console.error("Error updating business settings:", error);

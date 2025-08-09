@@ -1,4 +1,5 @@
 
+
 export interface Ticket {
     number: number;
     name: string;
@@ -90,6 +91,7 @@ export interface EventLog {
     userId: string;
     userName: string;
     businessId: string | null;
+    businessName: string | null;
     action: 'login' | 'logout' | 'create' | 'update' | 'delete';
     entity: 'user' | 'business' | 'ticket' | 'raffle' | 'settings';
     details: string; // e.g., "User 'admin' updated business 'Sorteo El Trébol'"

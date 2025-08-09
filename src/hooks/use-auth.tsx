@@ -4,7 +4,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { getOrCreateUser } from '@/lib/actions';
+import { getOrCreateUser, logEvent } from '@/lib/actions';
 import type { AppUser } from '@/lib/types';
 
 interface AuthContextType {
@@ -26,8 +26,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 // Fetch the full user profile from our database
                 const appUser = await getOrCreateUser(firebaseUser.uid, firebaseUser.email);
 
-                if (appUser) {
-                    // If user is found and not disabled, set them as the current user
+                if (appUser && !user) { // Only log event on new session creation
+                    setUser(appUser);
+                    await logEvent(appUser, 'login', 'user', 'User logged in successfully.');
+                } else if (appUser) {
                     setUser(appUser);
                 } else {
                     // User might be disabled or not exist in our DB. Sign them out from Firebase.
@@ -47,9 +49,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [user]);
 
   const signOut = async () => {
+    if (user) {
+        await logEvent(user, 'logout', 'user', 'User logged out.');
+    }
     try {
         await auth.signOut();
     } catch (error) {

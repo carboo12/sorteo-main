@@ -18,7 +18,7 @@ import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { createBusiness, updateBusiness } from "@/lib/actions";
 import { useRouter } from "next/navigation";
-import type { Business, Location } from "@/lib/types";
+import type { Business, Location, AppUser } from "@/lib/types";
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "El nombre debe tener al menos 2 caracteres." }),
@@ -34,9 +34,10 @@ const formSchema = z.object({
 
 interface BusinessFormProps {
     initialData?: Omit<Business, 'id'> & { id: string } | null;
+    creator: AppUser;
 }
 
-export default function BusinessForm({ initialData }: BusinessFormProps) {
+export default function BusinessForm({ initialData, creator }: BusinessFormProps) {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isLocating, setIsLocating] = useState(false);
     const { toast } = useToast();
@@ -96,8 +97,8 @@ export default function BusinessForm({ initialData }: BusinessFormProps) {
             };
 
             const result = isEditMode && initialData?.id
-                ? await updateBusiness(initialData.id, businessData)
-                : await createBusiness(businessData);
+                ? await updateBusiness(initialData.id, businessData, creator)
+                : await createBusiness(businessData, creator);
 
             if (result.success) {
                 toast({ title: "¡Éxito!", description: result.message });

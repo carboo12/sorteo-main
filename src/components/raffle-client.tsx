@@ -102,9 +102,9 @@ export default function RaffleClient() {
   };
 
   const handleBuyTicket = async (values: z.infer<typeof buyTicketSchema>) => {
-    if (!selectedNumber || !turnoInfo || !businessId) return;
+    if (!selectedNumber || !turnoInfo || !businessId || !user) return;
     setIsBuying(true);
-    const result = await buyTicket(turnoInfo, selectedNumber, values.name || null, businessId);
+    const result = await buyTicket(turnoInfo, selectedNumber, values.name || null, businessId, user);
     if (result.success) {
       toast({ title: '¡Éxito!', description: result.message });
       setTurnoData((prev) => ({
@@ -140,12 +140,12 @@ export default function RaffleClient() {
   };
 
   const handleDrawWinner = async () => {
-    if (!turnoInfo || !businessId) return;
+    if (!turnoInfo || !businessId || !user) return;
     setIsDrawing(true);
     
     await runTumbleEffect();
 
-    const result = await drawWinner(turnoInfo, businessId);
+    const result = await drawWinner(turnoInfo, businessId, user);
     if (result.success && result.winningNumber) {
       toast({
         title: '¡Tenemos un ganador!',
