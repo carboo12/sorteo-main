@@ -48,24 +48,37 @@ export default function SettingsPage() {
     });
     
     useEffect(() => {
-        if (authLoading || !user?.businessId) return;
-
-        const fetchSettings = async () => {
-            setIsLoading(true);
-            const settings = await getBusinessSettings(user!.businessId!);
-            if (settings) {
-                form.reset({
-                    exchangeRateUSDToNIO: settings.exchangeRateUSDToNIO,
-                    ticketPrice: settings.ticketPrice,
-                    drawTimes: settings.drawTimes,
-                });
-            }
+        if (authLoading) return;
+        
+        if (!user) {
             setIsLoading(false);
-        };
+            return;
+        }
 
-        fetchSettings();
+        if (user.businessId) {
+            const fetchSettings = async () => {
+                setIsLoading(true);
+                try {
+                    const settings = await getBusinessSettings(user.businessId!);
+                    if (settings) {
+                        form.reset({
+                            exchangeRateUSDToNIO: settings.exchangeRateUSDToNIO,
+                            ticketPrice: settings.ticketPrice,
+                            drawTimes: settings.drawTimes,
+                        });
+                    }
+                } catch (error) {
+                     toast({ variant: 'destructive', title: 'Error', description: 'No se pudo cargar la configuración.' });
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+            fetchSettings();
+        } else {
+             setIsLoading(false);
+        }
 
-    }, [user, authLoading, form]);
+    }, [user, authLoading, form, toast]);
 
 
     const onSubmit = async (data: SettingsFormValues) => {
@@ -74,13 +87,18 @@ export default function SettingsPage() {
             return;
         }
         setIsSubmitting(true);
-        const result = await updateBusinessSettings(user.businessId, data);
-        if (result.success) {
-            toast({ title: '¡Éxito!', description: 'La configuración se ha guardado correctamente.' });
-        } else {
-            toast({ variant: 'destructive', title: 'Error', description: result.message });
+        try {
+            const result = await updateBusinessSettings(user.businessId, data);
+            if (result.success) {
+                toast({ title: '¡Éxito!', description: 'La configuración se ha guardado correctamente.' });
+            } else {
+                toast({ variant: 'destructive', title: 'Error', description: result.message });
+            }
+        } catch (error) {
+             toast({ variant: 'destructive', title: 'Error', description: 'Ocurrió un error inesperado al guardar.' });
+        } finally {
+            setIsSubmitting(false);
         }
-        setIsSubmitting(false);
     };
 
     if (authLoading || isLoading) {
@@ -93,7 +111,7 @@ export default function SettingsPage() {
         );
     }
     
-    if (!user?.businessId) {
+    if (!user?.businessId && user?.role !== 'superuser') {
         return (
             <DashboardLayout>
                 <div className="flex-1 space-y-4 p-8 pt-6">
@@ -107,6 +125,32 @@ export default function SettingsPage() {
                                 </CardDescription>
                             </div>
                         </CardHeader>
+                    </Card>
+                </div>
+            </DashboardLayout>
+        );
+    }
+    
+    // Superuser can view this page but cannot edit settings as they don't belong to a business
+    if (user?.role === 'superuser') {
+         return (
+            <DashboardLayout>
+                <div className="flex-1 space-y-4 p-8 pt-6">
+                     <div className="flex items-center justify-between space-y-2">
+                        <div>
+                            <h2 className="text-3xl font-bold tracking-tight">Configuración del Negocio</h2>
+                             <p className="text-muted-foreground">
+                                Los superusuarios ven esta página pero no pueden editar configuraciones.
+                            </p>
+                        </div>
+                    </div>
+                     <Card>
+                        <CardHeader>
+                            <CardTitle>Vista de Superusuario</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p>La configuración es específica para cada negocio y debe ser gestionada por un administrador de ese negocio.</p>
+                        </CardContent>
                     </Card>
                 </div>
             </DashboardLayout>

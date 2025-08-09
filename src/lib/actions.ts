@@ -46,9 +46,7 @@ export async function getOrCreateUser(uid: string, email: string | null): Promis
     
     const userData = userSnap.data() as AppUser;
 
-    if (email === 'carboo12@gmail.com') {
-        userData.role = 'superuser';
-    } else if (email === 'firebase-adminsdk-fbsvc@sorteo-xpress.iam.gserviceaccount.com') {
+    if (email === 'carboo12@gmail.com' || email === 'firebase-adminsdk-fbsvc@sorteo-xpress.iam.gserviceaccount.com') {
         userData.role = 'superuser';
     }
     
@@ -358,7 +356,7 @@ export async function drawWinner(turnoInfo: TurnoInfo, businessId: string): Prom
   try {
     const { winningNumber } = await selectWinningNumber();
 
-    if (!winningNumber) {
+    if (winningNumber === undefined) {
         throw new Error('No se pudo generar un número ganador.');
     }
 
