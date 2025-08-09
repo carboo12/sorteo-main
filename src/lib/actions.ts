@@ -1,4 +1,5 @@
 
+
 'use server';
 
 import { adminFirestore, adminAuth, admin } from './firebase-admin-sdk';
@@ -116,17 +117,13 @@ export async function getOrCreateUser(uid: string, email: string | null): Promis
     const userData = userSnap.data() as AppUser;
 
     // This ensures your account always has superuser privileges, overriding DB value if necessary
-    if (email === 'carboo12@gmail.com' || email === 'firebase-adminsdk-fbsvc@sorteo-xpress.iam.gserviceaccount.com') {
+    if (email === 'carboo12@gmail.com') {
         userData.role = 'superuser';
     }
     
     if (userData.disabled) {
         await logError('Login attempt by disabled user', { userId: uid }, userData.businessId);
-        try {
-            await adminAuth.updateUser(uid, { disabled: true });
-        } catch(e) {
-            // Fails if already disabled, which is ok.
-        }
+        // No need to disable in Auth again, as getOrCreateUser isn't called if user is disabled in Auth
         return null;
     }
 
@@ -499,10 +496,9 @@ export async function getWinnerHistory(businessId: string): Promise<Winner[]> {
   const businessDoc = await adminFirestore.collection('businesses').doc(businessId).get();
   if (businessDoc.exists) {
     const data = businessDoc.data();
-    // Sort by date descending, then by turno (3, 2, 1)
+    // Sort by drawnAt date descending
     return (data?.winnerHistory || []).sort((a: Winner, b: Winner) => {
-        const dateComparison = new Date(b.drawnAt).getTime() - new Date(a.drawnAt).getTime();
-        return dateComparison;
+        return new Date(b.drawnAt).getTime() - new Date(a.drawnAt).getTime();
     });
   }
   return [];
@@ -552,5 +548,57 @@ export async function updateBusinessSettings(businessId: string, settings: Omit<
         console.error("Error updating business settings:", error);
         await logError(`updateBusinessSettings failed for business ${businessId}`, error, businessId);
         return { success: false, message: `Error al guardar la configuración: ${error.message}` };
+    }
+}
+
+// Prize Claim Action
+export async function claimPrize(
+    businessId: string,
+    winnerToClaim: Winner,
+    claimerId: string,
+    employee: AppUser
+): Promise<{ success: boolean; message: string; }> {
+    const businessRef = adminFirestore.collection('businesses').doc(businessId);
+    
+    try {
+        await adminFirestore.runTransaction(async (transaction) => {
+            const businessDoc = await transaction.get(businessRef);
+            if (!businessDoc.exists) {
+                throw new Error("Negocio no encontrado.");
+            }
+
+            const businessData = businessDoc.data() as Business;
+            const winnerHistory: Winner[] = businessData.winnerHistory || [];
+
+            const winnerIndex = winnerHistory.findIndex(w => w.drawnAt === winnerToClaim.drawnAt);
+
+            if (winnerIndex === -1) {
+                throw new Error("No se encontró el registro del ganador para actualizar.");
+            }
+            
+            if (winnerHistory[winnerIndex].claimed) {
+                throw new Error("Este premio ya ha sido entregado.");
+            }
+
+            // Update the winner object
+            winnerHistory[winnerIndex] = {
+                ...winnerHistory[winnerIndex],
+                claimed: true,
+                claimedAt: new Date().toISOString(),
+                claimerId: claimerId,
+                claimedByUserId: employee.uid,
+                claimedByUserName: employee.name,
+            };
+
+            transaction.update(businessRef, { winnerHistory: winnerHistory });
+        });
+        
+        await logEvent(employee, 'claim', 'prize', `Claimed prize for winner #${winnerToClaim.winningNumber} from ${winnerToClaim.date}`);
+
+        return { success: true, message: "Premio entregado exitosamente." };
+    } catch (error: any) {
+        console.error("Error in claimPrize:", error);
+        await logError(`claimPrize failed for business ${businessId}`, error, businessId);
+        return { success: false, message: error.message };
     }
 }

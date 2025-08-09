@@ -17,7 +17,7 @@ import {
   SidebarFooter,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { Home, Ticket, Users, LogOut, Building, Settings, ShieldAlert, History } from 'lucide-react';
+import { Home, Ticket, Users, LogOut, Building, Settings, ShieldAlert, History, ClipboardList } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { Loader2 } from 'lucide-react';
 
@@ -49,6 +49,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const menuItems = [
     { href: '/dashboard', label: 'Inicio', icon: <Home />, roles: ['superuser', 'admin', 'seller'] },
     { href: '/dashboard/raffle', label: 'Sorteos', icon: <Ticket />, roles: ['superuser', 'admin', 'seller'] },
+    { href: '/dashboard/reports', label: 'Reportes', icon: <ClipboardList />, roles: ['superuser', 'admin'] },
     { href: '/dashboard/businesses', label: 'Negocios', icon: <Building />, roles: ['superuser'] },
     { href: '/dashboard/users', label: 'Usuarios', icon: <Users />, roles: ['superuser', 'admin'] },
     { href: '/dashboard/settings', label: 'Configuración', icon: <Settings />, roles: ['superuser', 'admin'] },

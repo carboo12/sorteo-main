@@ -22,8 +22,14 @@ export interface Winner {
     winnerName: string;
     prize: string;
     drawnAt: string;
-    turno: string;
+    turno: 'turno1' | 'turno2' | 'turno3';
     date: string;
+    // Prize claim fields
+    claimed?: boolean;
+    claimedAt?: string;
+    claimerId?: string; // National ID of the person who claimed
+    claimedByUserId?: string; // ID of the employee who registered the claim
+    claimedByUserName?: string;
 }
 
 export interface AppUser {
@@ -92,8 +98,8 @@ export interface EventLog {
     userName: string;
     businessId: string | null;
     businessName: string | null;
-    action: 'login' | 'logout' | 'create' | 'update' | 'delete';
-    entity: 'user' | 'business' | 'ticket' | 'raffle' | 'settings';
+    action: 'login' | 'logout' | 'create' | 'update' | 'delete' | 'claim';
+    entity: 'user' | 'business' | 'ticket' | 'raffle' | 'settings' | 'prize';
     details: string; // e.g., "User 'admin' updated business 'Sorteo El Trébol'"
 }
 
