@@ -16,10 +16,6 @@ import { getBusinessSettings, updateBusinessSettings } from '@/lib/actions';
 import type { BusinessSettings } from '@/lib/types';
 import DashboardLayout from '@/components/dashboard-layout';
 
-const prizeSchema = z.object({
-  name: z.string().min(1, { message: "El nombre del premio no puede estar vacío." }),
-});
-
 const settingsSchema = z.object({
   exchangeRateUSDToNIO: z.coerce.number().positive({ message: "La tasa de cambio debe ser un número positivo." }),
   ticketPrice: z.coerce.number().min(0, { message: "El precio del número no puede ser negativo." }),
@@ -28,7 +24,20 @@ const settingsSchema = z.object({
     turno2: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, { message: "Formato de hora inválido (HH:mm)."}),
     turno3: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, { message: "Formato de hora inválido (HH:mm)."}),
   }),
-  prizes: z.array(prizeSchema).optional(),
+  turnos: z.object({
+     turno1: z.object({
+      enabled: z.boolean(),
+      prize: z.string().min(1, "El premio es obligatorio si el turno está habilitado."),
+    }),
+    turno2: z.object({
+      enabled: z.boolean(),
+      prize: z.string().min(1, "El premio es obligatorio si el turno está habilitado."),
+    }),
+    turno3: z.object({
+      enabled: z.boolean(),
+      prize: z.string().min(1, "El premio es obligatorio si el turno está habilitado."),
+    }),
+  }),
 });
 
 type SettingsFormValues = z.infer<typeof settingsSchema>;
@@ -49,13 +58,12 @@ export default function SettingsPage() {
                 turno2: '15:00',
                 turno3: '21:00',
             },
-            prizes: [],
+            turnos: {
+                turno1: { enabled: true, prize: '' },
+                turno2: { enabled: true, prize: '' },
+                turno3: { enabled: true, prize: '' },
+            },
         }
-    });
-
-    const { fields, append, remove } = useFieldArray({
-        control: form.control,
-        name: "prizes",
     });
     
     useEffect(() => {
@@ -76,7 +84,7 @@ export default function SettingsPage() {
                             exchangeRateUSDToNIO: settings.exchangeRateUSDToNIO,
                             ticketPrice: settings.ticketPrice,
                             drawTimes: settings.drawTimes,
-                            prizes: settings.prizes || [],
+                            turnos: settings.turnos
                         });
                     }
                 } catch (error) {
@@ -217,7 +225,7 @@ export default function SettingsPage() {
                                                                 <FormControl>
                                                                     <Input type="number" placeholder="Ej: 10" {...field} />
                                                                 </FormControl>
-                                                                <FormDescription>El costo de cada número de rifa en la moneda local.</FormDescription>
+                                                                <FormDescription>El costo de cada número. Poner 0 si es gratis.</FormDescription>
                                                                 <FormMessage />
                                                             </FormItem>
                                                         )}
@@ -231,95 +239,12 @@ export default function SettingsPage() {
                                         <div className="flex items-start gap-4">
                                             <Clock className="h-8 w-8 text-primary mt-1" />
                                             <div className='flex-1'>
-                                                <h3 className="text-lg font-semibold">Horarios de Sorteos</h3>
-                                                <p className="text-sm text-muted-foreground mb-4">Establece la hora de cierre para cada turno.</p>
-                                                <div className="grid sm:grid-cols-3 gap-6">
-                                                    <FormField
-                                                        control={form.control}
-                                                        name="drawTimes.turno1"
-                                                        render={({ field }) => (
-                                                            <FormItem>
-                                                            <FormLabel>Turno Mañana</FormLabel>
-                                                            <FormControl>
-                                                                <Input type="time" {...field} />
-                                                            </FormControl>
-                                                            <FormMessage />
-                                                            </FormItem>
-                                                        )}
-                                                    />
-                                                    <FormField
-                                                        control={form.control}
-                                                        name="drawTimes.turno2"
-                                                        render={({ field }) => (
-                                                            <FormItem>
-                                                            <FormLabel>Turno Tarde</FormLabel>
-                                                            <FormControl>
-                                                                <Input type="time" {...field} />
-                                                            </FormControl>
-                                                            <FormMessage />
-                                                            </FormItem>
-                                                        )}
-                                                    />
-                                                    <FormField
-                                                        control={form.control}
-                                                        name="drawTimes.turno3"
-                                                        render={({ field }) => (
-                                                            <FormItem>
-                                                            <FormLabel>Turno Noche</FormLabel>
-                                                            <FormControl>
-                                                                <Input type="time" {...field} />
-                                                            </FormControl>
-                                                            <FormMessage />
-                                                            </FormItem>
-                                                        )}
-                                                    />
-                                                </div>
+                                                <h3 className="text-lg font-semibold">Horarios de Sorteos y Premios</h3>
+                                                <p className="text-sm text-muted-foreground mb-4">Establece la hora de cierre y el premio para cada turno.</p>
                                             </div>
                                         </div>
                                     </Card>
 
-                                    <Card className="p-6 border-none shadow-none">
-                                        <div className="flex items-start gap-4">
-                                            <Gift className="h-8 w-8 text-primary mt-1" />
-                                            <div className='flex-1'>
-                                                <h3 className="text-lg font-semibold">Gestión de Premios</h3>
-                                                <p className="text-sm text-muted-foreground mb-4">Define los posibles premios para los sorteos.</p>
-                                                <div className="space-y-4">
-                                                    {fields.map((field, index) => (
-                                                        <div key={field.id} className="flex items-center gap-2">
-                                                            <FormField
-                                                                control={form.control}
-                                                                name={`prizes.${index}.name`}
-                                                                render={({ field }) => (
-                                                                    <FormItem className="flex-1">
-                                                                        <FormControl>
-                                                                            <Input {...field} placeholder={`Premio #${index + 1}`} />
-                                                                        </FormControl>
-                                                                        <FormMessage />
-                                                                    </FormItem>
-                                                                )}
-                                                            />
-                                                            <Button
-                                                                type="button"
-                                                                variant="destructive"
-                                                                size="icon"
-                                                                onClick={() => remove(index)}
-                                                            >
-                                                                <Trash2 className="h-4 w-4" />
-                                                            </Button>
-                                                        </div>
-                                                    ))}
-                                                    <Button
-                                                        type="button"
-                                                        variant="outline"
-                                                        onClick={() => append({ name: "" })}
-                                                    >
-                                                        Añadir Premio
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </Card>
                                 </div>
                             </CardContent>
                         </Card>

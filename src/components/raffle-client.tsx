@@ -194,7 +194,7 @@ export default function RaffleClient() {
   };
   
   const canDraw = userRole === 'admin' || userRole === 'superuser';
-  const isCurrentTurnoEnabled = turnoInfo && settings ? settings.turnos[turnoInfo.turno].enabled : false;
+  const isCurrentTurnoEnabled = turnoInfo && settings?.turnos ? settings.turnos[turnoInfo.turno].enabled : false;
 
   if (authLoading || (isLoading && businessId)) {
     return (
@@ -311,7 +311,7 @@ export default function RaffleClient() {
                             <TableRow key={index}>
                                 <TableCell className="font-bold text-primary">{winner.winningNumber}</TableCell>
                                 <TableCell>{winner.winnerName}</TableCell>
-                                <TableCell className="flex items-center gap-2 text-xs"><Gift size={14} />{winner.prize}</TableCell>
+                                <TableCell className="text-xs">{winner.prize}</TableCell>
                                 <TableCell className="text-xs text-muted-foreground">{winner.drawnAt}</TableCell>
                             </TableRow>
                             ))
@@ -402,5 +402,3 @@ export default function RaffleClient() {
     </div>
   );
 }
-
-    
