@@ -7,15 +7,12 @@ const USER_KEY = 'app_user';
 
 export function login(user: AppUser) {
   if (typeof window !== 'undefined') {
-    // The browser will automatically dispatch a 'storage' event to other tabs.
-    // Manually dispatching it was causing an infinite loop in the same tab.
     localStorage.setItem(USER_KEY, JSON.stringify(user));
   }
 }
 
 export function signOutUser() {
   if (typeof window !== 'undefined') {
-    // The browser will automatically dispatch a 'storage' event to other tabs.
     localStorage.removeItem(USER_KEY);
   }
 }
