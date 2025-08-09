@@ -218,7 +218,7 @@ export default function SettingsPage() {
                                                     <FormControl>
                                                         <Input type="number" placeholder="Ej: 10" {...field} />
                                                     </FormControl>
-                                                    <FormDescription>El costo de cada número de rifa en la moneda local.</FormDescription>
+                                                    <FormDescription>El costo de cada número. Poner 0 si es gratis.</FormDescription>
                                                     <FormMessage />
                                                 </FormItem>
                                             )}

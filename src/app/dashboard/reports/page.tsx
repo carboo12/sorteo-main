@@ -223,7 +223,7 @@ export default function ReportsPage() {
                     <DialogHeader>
                         <DialogTitle>Registrar Entrega de Premio</DialogTitle>
                         <DialogDescription>
-                            Confirma la entrega para el ganador <span className="font-bold">{selectedWinner?.winnerName}</span> (Número <span className="font-bold text-primary">{selectedWinner?.winningNumber}</span>). Ingresa el número de identificación para el registro.
+                            Confirma la entrega para el ganador <span className="font-bold">{selectedWinner?.winnerName}</span> (Número <span className="font-bold text-primary">{selectedWinner?.winningNumber}</span>). Ingresa el número de identificación de quien retira para el registro.
                         </DialogDescription>
                     </DialogHeader>
                     <Form {...form}>
@@ -233,7 +233,7 @@ export default function ReportsPage() {
                                 name="claimerId"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Cédula o Identificación del Ganador</FormLabel>
+                                        <FormLabel>Cédula o Identificación de quien retira</FormLabel>
                                         <FormControl>
                                             <Input placeholder="Ej: 001-123456-0001A" {...field} />
                                         </FormControl>
@@ -255,4 +255,3 @@ export default function ReportsPage() {
         </DashboardLayout>
     );
 }
-
