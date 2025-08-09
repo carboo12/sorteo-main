@@ -26,7 +26,6 @@ export default function DashboardHomePage() {
 
   useEffect(() => {
     if (authLoading) {
-      // Still waiting for auth state to resolve
       return;
     }
 
@@ -72,7 +71,7 @@ export default function DashboardHomePage() {
   
   const renderSuperuserDashboard = () => (
     <DashboardLayout>
-      <div className="flex-1 space-y-4 p-8 pt-6">
+      <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
         <h2 className="text-3xl font-bold tracking-tight">Bienvenido, Superusuario</h2>
         <Card>
           <CardHeader>
@@ -114,7 +113,7 @@ export default function DashboardHomePage() {
   if (!user?.businessId) {
     return (
         <DashboardLayout>
-            <div className="flex-1 flex items-center justify-center p-8">
+            <div className="flex-1 flex items-center justify-center p-4 md:p-8">
                  <Card className="w-full max-w-md">
                     <CardHeader className="text-center">
                         <CardTitle>Sin Asignación de Negocio</CardTitle>
@@ -133,7 +132,7 @@ export default function DashboardHomePage() {
 
   return (
     <DashboardLayout>
-      <div className="flex-1 space-y-4 p-8 pt-6">
+      <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
         <div className="flex items-center justify-between space-y-2">
           <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
         </div>
