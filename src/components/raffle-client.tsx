@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -163,18 +163,18 @@ export default function RaffleClient() {
         <div className="lg:col-span-2">
           <Card className="shadow-lg border-2 border-primary/20 bg-card">
             <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Sparkles className="text-primary" />
-                  <span>Selecciona tu número de la suerte</span>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                     <CardTitle className="flex items-center gap-3">
+                        <Sparkles className="text-primary" />
+                        <span>Selecciona tu número</span>
+                    </CardTitle>
+                    {turnoInfo && (
+                        <div className="text-sm font-medium text-muted-foreground flex items-center gap-4">
+                            <div className='flex items-center gap-1.5'><Calendar size={16} /> {turnoInfo.date}</div>
+                            <div className='flex items-center gap-1.5'><Clock size={16} /> Turno: {turnoInfo.turno.replace('turno', '')}</div>
+                        </div>
+                    )}
                 </div>
-                {turnoInfo && (
-                  <div className="text-sm font-medium text-muted-foreground flex items-center gap-4">
-                     <div className='flex items-center gap-1.5'><Calendar size={16} /> {turnoInfo.date}</div>
-                     <div className='flex items-center gap-1.5'><Clock size={16} /> Turno: {turnoInfo.turno.replace('turno', '')}</div>
-                  </div>
-                )}
-              </CardTitle>
             </CardHeader>
             <CardContent>
                 <div className="grid grid-cols-10 gap-2">
@@ -200,20 +200,20 @@ export default function RaffleClient() {
                   })}
                 </div>
             </CardContent>
+             {canDraw && (
+                <CardFooter className="pt-6 justify-center">
+                    <Button
+                        size="lg"
+                        className="font-bold text-xl px-12 py-8 shadow-lg transform hover:scale-105"
+                        onClick={handleDrawWinner}
+                        disabled={isDrawing || !!turnoData.winningNumber || turnoData.tickets.length === 0}
+                    >
+                        {isDrawing ? <Loader2 className="mr-2 h-6 w-6 animate-spin" /> : <Trophy className="mr-2 h-6 w-6" />}
+                        {!!turnoData.winningNumber ? 'Ganador Seleccionado' : '¡Realizar Sorteo!'}
+                    </Button>
+                </CardFooter>
+            )}
           </Card>
-          {canDraw && (
-            <div className="mt-6 flex justify-center">
-                <Button
-                    size="lg"
-                    className="font-bold text-xl px-12 py-8 shadow-lg transform hover:scale-105"
-                    onClick={handleDrawWinner}
-                    disabled={isDrawing || !!turnoData.winningNumber || turnoData.tickets.length === 0}
-                >
-                    {isDrawing ? <Loader2 className="mr-2 h-6 w-6 animate-spin" /> : <Trophy className="mr-2 h-6 w-6" />}
-                    {!!turnoData.winningNumber ? 'Ganador Seleccionado' : '¡Realizar Sorteo!'}
-                </Button>
-            </div>
-          )}
         </div>
 
         <div className="lg:col-span-1 space-y-8">
