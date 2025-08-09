@@ -72,7 +72,12 @@ export interface UserUpdateData {
 export interface BusinessSettings {
     id: string; // Should be the same as the businessId
     exchangeRateUSDToNIO: number;
-    // Add other business-specific settings here
+    ticketPrice: number;
+    drawTimes: {
+        turno1: string; // "HH:mm" format
+        turno2: string; // "HH:mm" format
+        turno3: string; // "HH:mm" format
+    };
 }
 
 export interface EventLog {

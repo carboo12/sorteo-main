@@ -2,7 +2,7 @@
 'use server';
 
 import { adminFirestore, adminAuth, admin } from './firebase-admin-sdk';
-import type { AppUser, Business, Ticket, TurnoData, TurnoInfo, Winner, UserFormData, UserUpdateData } from './types';
+import type { AppUser, Business, Ticket, TurnoData, TurnoInfo, Winner, UserFormData, UserUpdateData, BusinessSettings } from './types';
 import { selectWinningNumber } from '@/ai/flows/select-winning-number';
 
 
@@ -393,6 +393,7 @@ export async function drawWinner(turnoInfo: TurnoInfo, businessId: string): Prom
     return { success: true, winningNumber, message: `El número ganador es ${winningNumber}!` };
   } catch (error: any) {
     console.error("Error in drawWinner:", error);
+    await logError(`drawWinner failed for business ${businessId}`, error, businessId);
     return { success: false, message: error.message };
   }
 }
@@ -404,4 +405,43 @@ export async function getWinnerHistory(businessId: string): Promise<Winner[]> {
     return (data?.winnerHistory || []).sort((a: Winner, b: Winner) => new Date(b.drawnAt).getTime() - new Date(a.drawnAt).getTime());
   }
   return [];
+}
+
+
+// Settings Actions
+export async function getBusinessSettings(businessId: string): Promise<BusinessSettings | null> {
+    try {
+        const docRef = adminFirestore.collection('business_settings').doc(businessId);
+        const docSnap = await docRef.get();
+        if (docSnap.exists) {
+            return { id: docSnap.id, ...docSnap.data() } as BusinessSettings;
+        }
+        // Return default settings if none exist
+        return {
+            id: businessId,
+            exchangeRateUSDToNIO: 36.5,
+            ticketPrice: 10,
+            drawTimes: {
+                turno1: '11:00',
+                turno2: '15:00',
+                turno3: '21:00',
+            }
+        };
+    } catch (error) {
+        console.error("Error getting business settings:", error);
+        await logError(`getBusinessSettings failed for business ${businessId}`, error, businessId);
+        return null;
+    }
+}
+
+export async function updateBusinessSettings(businessId: string, settings: Omit<BusinessSettings, 'id'>): Promise<{ success: boolean; message: string; }> {
+    try {
+        const docRef = adminFirestore.collection('business_settings').doc(businessId);
+        await docRef.set(settings, { merge: true });
+        return { success: true, message: "Configuración guardada con éxito." };
+    } catch (error: any) {
+        console.error("Error updating business settings:", error);
+        await logError(`updateBusinessSettings failed for business ${businessId}`, error, businessId);
+        return { success: false, message: `Error al guardar la configuración: ${error.message}` };
+    }
 }
