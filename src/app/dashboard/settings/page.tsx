@@ -24,28 +24,71 @@ const settingsSchema = z.object({
   turnos: z.object({
     turno1: z.object({
       enabled: z.boolean(),
-      drawTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, { message: "Formato de hora inválido (HH:mm)."}),
-      prize: z.string().min(1, "El premio es obligatorio si el turno está habilitado."),
+      drawTime: z.string(),
+      prize: z.string(),
     }),
     turno2: z.object({
       enabled: z.boolean(),
-      drawTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, { message: "Formato de hora inválido (HH:mm)."}),
-      prize: z.string().min(1, "El premio es obligatorio si el turno está habilitado."),
+      drawTime: z.string(),
+      prize: z.string(),
     }),
     turno3: z.object({
       enabled: z.boolean(),
-      drawTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, { message: "Formato de hora inválido (HH:mm)."}),
-      prize: z.string().min(1, "El premio es obligatorio si el turno está habilitado."),
+      drawTime: z.string(),
+      prize: z.string(),
     }),
   }),
-}).refine(data => {
-    if (data.turnos.turno1.enabled && !data.turnos.turno1.prize) return false;
-    if (data.turnos.turno2.enabled && !data.turnos.turno2.prize) return false;
-    if (data.turnos.turno3.enabled && !data.turnos.turno3.prize) return false;
-    return true;
-}, {
-    message: "El premio no puede estar vacío para un turno habilitado.",
-    path: ['turnos'], 
+}).superRefine((data, ctx) => {
+    const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+    
+    if (data.turnos.turno1.enabled) {
+        if (!timeRegex.test(data.turnos.turno1.drawTime)) {
+             ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "Formato de hora inválido (HH:mm).",
+                path: ["turnos", "turno1", "drawTime"],
+            });
+        }
+        if (data.turnos.turno1.prize.length < 1) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "El premio es obligatorio.",
+                path: ["turnos", "turno1", "prize"],
+            });
+        }
+    }
+    if (data.turnos.turno2.enabled) {
+        if (!timeRegex.test(data.turnos.turno2.drawTime)) {
+             ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "Formato de hora inválido (HH:mm).",
+                path: ["turnos", "turno2", "drawTime"],
+            });
+        }
+        if (data.turnos.turno2.prize.length < 1) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "El premio es obligatorio.",
+                path: ["turnos", "turno2", "prize"],
+            });
+        }
+    }
+    if (data.turnos.turno3.enabled) {
+        if (!timeRegex.test(data.turnos.turno3.drawTime)) {
+             ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "Formato de hora inválido (HH:mm).",
+                path: ["turnos", "turno3", "drawTime"],
+            });
+        }
+        if (data.turnos.turno3.prize.length < 1) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "El premio es obligatorio.",
+                path: ["turnos", "turno3", "prize"],
+            });
+        }
+    }
 });
 
 
