@@ -3,7 +3,6 @@
 
 import { adminFirestore, adminAuth, admin } from './firebase-admin-sdk';
 import type { AppUser, Business, Ticket, TurnoData, TurnoInfo, Winner, UserFormData, UserUpdateData, BusinessSettings } from './types';
-import { selectWinningNumber } from '@/ai/flows/select-winning-number';
 
 
 export async function logError(context: string, error: any, businessId?: string | null): Promise<void> {
@@ -354,7 +353,8 @@ export async function drawWinner(turnoInfo: TurnoInfo, businessId: string): Prom
   const businessRef = adminFirestore.collection('businesses').doc(businessId);
   
   try {
-    const { winningNumber } = await selectWinningNumber();
+    // Generate a winning number locally instead of using AI.
+    const winningNumber = Math.floor(Math.random() * 100) + 1;
 
     if (winningNumber === undefined) {
         throw new Error('No se pudo generar un número ganador.');
