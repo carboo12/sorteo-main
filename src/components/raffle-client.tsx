@@ -15,7 +15,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { getTurnoData, buyTicket, drawWinner, getWinnerHistory } from '@/lib/actions';
-import { getCurrentTurno } from '@/lib/utils';
+import { getCurrentTurno, cn } from '@/lib/utils';
 import type { TurnoData, Winner, TurnoInfo } from '@/lib/types';
 import { Loader2, Ticket, Trophy, User, Calendar, Clock, Sparkles } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -37,6 +37,8 @@ export default function RaffleClient() {
   const [isLoading, setIsLoading] = useState(true);
   const [isBuying, setIsBuying] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
+  const [isSpinning, setIsSpinning] = useState(false);
+  const [highlightedNumber, setHighlightedNumber] = useState<number | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedNumber, setSelectedNumber] = useState<number | null>(null);
   const { toast } = useToast();
@@ -115,10 +117,34 @@ export default function RaffleClient() {
     }
     setIsBuying(false);
   };
+  
+  const runTumbleEffect = async () => {
+    setIsSpinning(true);
+    const spinDuration = 3000; // 3 seconds
+    const intervalTime = 100; // update every 100ms
+    let spinInterval: NodeJS.Timeout;
+
+    return new Promise<void>((resolve) => {
+      spinInterval = setInterval(() => {
+        const randomNumber = Math.floor(Math.random() * 100) + 1;
+        setHighlightedNumber(randomNumber);
+      }, intervalTime);
+
+      setTimeout(() => {
+        clearInterval(spinInterval);
+        setHighlightedNumber(null);
+        setIsSpinning(false);
+        resolve();
+      }, spinDuration);
+    });
+  };
 
   const handleDrawWinner = async () => {
     if (!turnoInfo || !businessId) return;
     setIsDrawing(true);
+    
+    await runTumbleEffect();
+
     const result = await drawWinner(turnoInfo, businessId);
     if (result.success && result.winningNumber) {
       toast({
@@ -181,17 +207,19 @@ export default function RaffleClient() {
                   {Array.from({ length: 100 }, (_, i) => i + 1).map((number) => {
                     const isSold = soldNumbers.has(number);
                     const isWinner = number === turnoData.winningNumber;
+                    const isHighlighted = number === highlightedNumber;
                     return (
                       <Button
                         key={number}
                         variant={isSold ? 'secondary' : 'outline'}
-                        className={`aspect-square h-auto w-auto text-lg font-bold transition-all duration-300 transform hover:scale-110
-                          ${isWinner ? 'bg-primary text-primary-foreground animate-pulse-glow shadow-lg' : ''}
-                          ${isSold && !isWinner ? 'bg-muted text-muted-foreground line-through' : ''}
-                          ${turnoData.winningNumber ? 'cursor-not-allowed' : ''}
-                        `}
+                        className={cn(`aspect-square h-auto w-auto text-lg font-bold transition-all duration-100 transform hover:scale-110`,
+                          isWinner && 'bg-accent text-accent-foreground ring-4 ring-accent-foreground ring-offset-2 animate-pulse-glow shadow-lg',
+                          isHighlighted && !isWinner && 'bg-primary/50 text-primary-foreground scale-110',
+                          isSold && !isWinner && !isHighlighted && 'bg-muted text-muted-foreground line-through',
+                          turnoData.winningNumber || isDrawing ? 'cursor-not-allowed' : ''
+                        )}
                         onClick={() => handleSelectNumber(number)}
-                        disabled={isSold || !!turnoData.winningNumber}
+                        disabled={isSold || !!turnoData.winningNumber || isDrawing}
                         aria-label={isSold ? `Número ${number} vendido` : `Comprar número ${number}`}
                       >
                         {number}
@@ -208,8 +236,8 @@ export default function RaffleClient() {
                         onClick={handleDrawWinner}
                         disabled={isDrawing || !!turnoData.winningNumber || turnoData.tickets.length === 0}
                     >
-                        {isDrawing ? <Loader2 className="mr-2 h-6 w-6 animate-spin" /> : <Trophy className="mr-2 h-6 w-6" />}
-                        {!!turnoData.winningNumber ? 'Ganador Seleccionado' : '¡Realizar Sorteo!'}
+                        {isDrawing || isSpinning ? <Loader2 className="mr-2 h-6 w-6 animate-spin" /> : <Trophy className="mr-2 h-6 w-6" />}
+                        {!!turnoData.winningNumber ? 'Ganador Seleccionado' : isSpinning ? 'Sorteando...' : '¡Realizar Sorteo!'}
                     </Button>
                 </CardFooter>
             )}

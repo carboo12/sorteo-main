@@ -68,6 +68,9 @@ export interface UserUpdateData {
 }
 
 // New Types for new features
+export interface Prize {
+    name: string;
+}
 
 export interface BusinessSettings {
     id: string; // Should be the same as the businessId
@@ -78,6 +81,7 @@ export interface BusinessSettings {
         turno2: string; // "HH:mm" format
         turno3: string; // "HH:mm" format
     };
+    prizes?: Prize[];
 }
 
 export interface EventLog {

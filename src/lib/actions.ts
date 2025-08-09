@@ -39,49 +39,56 @@ export async function getOrCreateUser(uid: string, email: string | null): Promis
     let userSnap = await userRef.get();
 
     if (!userSnap.exists) {
-        console.warn(`User with UID ${uid} not found in Firestore. They should be created via the admin panel.`);
+        // Superuser creation on first login
+        if (email === 'carboo12@gmail.com') {
+            console.log(`First login for superuser ${email}. Creating user document.`);
+            const superUserData: AppUser = {
+                uid,
+                email,
+                name: 'Super User',
+                role: 'superuser',
+                businessId: null,
+            };
+            await userRef.set(superUserData);
+            return superUserData;
+        }
+        console.warn(`User with UID ${uid} not found in Firestore and is not superuser.`);
         return null;
     }
     
     const userData = userSnap.data() as AppUser;
 
+    // This ensures your account always has superuser privileges, overriding DB value if necessary
     if (email === 'carboo12@gmail.com' || email === 'firebase-adminsdk-fbsvc@sorteo-xpress.iam.gserviceaccount.com') {
         userData.role = 'superuser';
     }
     
-    // Final checks before returning user data
-
-    // Check if user is disabled in Firestore
-    if (userData?.disabled) {
-        await logError('Login attempt by disabled user', { userId: uid });
-        // Make sure Firebase Auth state matches Firestore state
+    if (userData.disabled) {
+        await logError('Login attempt by disabled user', { userId: uid }, userData.businessId);
         try {
             await adminAuth.updateUser(uid, { disabled: true });
         } catch(e) {
-            // This might fail if the user is already disabled, which is fine.
+            // Fails if already disabled, which is ok.
         }
         return null;
     }
 
-    // If user is associated with a business, check the business's status
-    if (userData?.businessId) {
+    if (userData.businessId) {
         try {
             const businessRef = adminFirestore.collection('businesses').doc(userData.businessId);
             const businessSnap = await businessRef.get();
 
             if (!businessSnap.exists) {
                 await logError('Login attempt by user with non-existent business', { userId: uid, businessId: userData.businessId }, userData.businessId);
-                return null; // Business does not exist
+                return null;
             }
 
             const businessData = businessSnap.data() as Business;
             const now = new Date();
             const licenseExpiresAt = new Date(businessData.licenseExpiresAt);
 
-            // Check if business is disabled or license is expired
             if (businessData.disabled || licenseExpiresAt < now) {
                 if (licenseExpiresAt < now && !businessData.disabled) {
-                    // Automatically disable if license expired
                     await businessRef.update({ disabled: true });
                 }
                 await logError('Login attempt for disabled or expired business', { userId: uid, businessId: userData.businessId }, userData.businessId);
@@ -353,7 +360,6 @@ export async function drawWinner(turnoInfo: TurnoInfo, businessId: string): Prom
   const businessRef = adminFirestore.collection('businesses').doc(businessId);
   
   try {
-    // Generate a winning number locally instead of using AI.
     const winningNumber = Math.floor(Math.random() * 100) + 1;
 
     if (winningNumber === undefined) {
@@ -372,6 +378,10 @@ export async function drawWinner(turnoInfo: TurnoInfo, businessId: string): Prom
       }
 
       const turnoData = turnoDoc.data() as TurnoData;
+      if (turnoData.winningNumber) {
+        throw new Error("El sorteo para este turno ya se ha realizado.");
+      }
+
       const ticketWinner = (turnoData?.tickets || []).find((t: Ticket) => t.number === winningNumber);
 
       const winnerHistoryEntry: Winner = {
@@ -423,7 +433,8 @@ export async function getBusinessSettings(businessId: string): Promise<BusinessS
                 turno1: '11:00',
                 turno2: '15:00',
                 turno3: '21:00',
-            }
+            },
+            prizes: [],
         };
     } catch (error) {
         console.error("Error getting business settings:", error);
