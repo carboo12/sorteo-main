@@ -53,6 +53,8 @@ export default function LoginPage() {
              errorMessage = 'Correo electrónico o contraseña incorrectos.';
         } else if (error.message.includes("inhabilitada")) {
              errorMessage = "Tu cuenta ha sido inhabilitada. Contacta al administrador.";
+        } else if (error.code === 'auth/too-many-requests') {
+             errorMessage = "Demasiados intentos fallidos. Inténtalo de nuevo más tarde.";
         }
 
         toast({

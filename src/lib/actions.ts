@@ -37,21 +37,21 @@ export async function getOrCreateUser(uid: string, email: string | null): Promis
     let userSnap = await userRef.get();
     let userData: AppUser | null = null;
     
-    // Special check for the superuser developer account
-    const superUserEmail = "firebase-adminsdk-fbsvc@sorteo-xpress.iam.gserviceaccount.com";
+    const superUserDevEmail = "carboo12@gmail.com";
+    const superUserServiceAccount = "firebase-adminsdk-fbsvc@sorteo-xpress.iam.gserviceaccount.com";
 
-    if (email === superUserEmail) {
-        // This is the superuser, ensure their document is correct.
+    // This handles the case for the main developer and the service account as superusers
+    if (email === superUserDevEmail || email === superUserServiceAccount) {
         const superUserData: AppUser = {
             uid,
             email,
             name: 'Super Usuario',
             role: 'superuser',
-            businessId: null, // Superuser is not tied to a business
+            businessId: null, 
             disabled: false,
         };
         
-        if (!userSnap.exists || JSON.stringify(userSnap.data()) !== JSON.stringify(superUserData)) {
+        if (!userSnap.exists || userSnap.data()?.role !== 'superuser') {
            await userRef.set(superUserData, { merge: true });
         }
         userData = superUserData;
@@ -59,9 +59,7 @@ export async function getOrCreateUser(uid: string, email: string | null): Promis
     } else if (userSnap.exists) {
         userData = userSnap.data() as AppUser;
     } else {
-        console.warn(`User with UID ${uid} not found in Firestore.`);
-        // Don't create a new user here, they should be created via the createUser function by an admin.
-        // This prevents random sign-ups.
+        console.warn(`User with UID ${uid} not found in Firestore. They should be created via the admin panel.`);
         return null;
     }
     
@@ -70,6 +68,12 @@ export async function getOrCreateUser(uid: string, email: string | null): Promis
     // Check if user is disabled in Firestore
     if (userData?.disabled) {
         await logError('Login attempt by disabled user', { userId: uid });
+        // Make sure Firebase Auth state matches Firestore state
+        try {
+            await adminAuth.updateUser(uid, { disabled: true });
+        } catch(e) {
+            // This might fail if the user is already disabled, which is fine.
+        }
         return null;
     }
 
