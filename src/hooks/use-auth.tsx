@@ -1,11 +1,12 @@
 
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { getOrCreateUser, logEvent } from '@/lib/actions';
 import type { AppUser } from '@/lib/types';
+import { useToast } from './use-toast';
 
 interface AuthContextType {
   user: AppUser | null;
@@ -15,44 +16,23 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType>({ user: null, loading: true, signOut: () => {} });
 
+const INACTIVITY_TIMEOUT_MS = 60 * 60 * 1000; // 1 hour
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
-        if (firebaseUser) {
-            try {
-                const appUser = await getOrCreateUser(firebaseUser.uid, firebaseUser.email);
-
-                if (appUser) {
-                    // Only log event on new session creation, check if user state is going from null to a user
-                    if (!user) { 
-                         await logEvent(appUser, 'login', 'user', 'User logged in successfully.');
-                    }
-                    setUser(appUser);
-                } else {
-                    // User might be disabled or not exist in our DB. Sign them out from Firebase.
-                    await auth.signOut(); 
-                    setUser(null);
-                }
-            } catch (error) {
-                console.error("Error getting user profile, signing out:", error);
-                await auth.signOut();
-                setUser(null);
-            }
-        } else {
-            // No Firebase user is signed in.
-            setUser(null);
-        }
-        setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  const signOut = async () => {
-    if (user) {
+  const signOut = useCallback(async (isTimeout = false) => {
+    if (isTimeout && user) {
+        toast({
+            title: 'Sesión Expirada',
+            description: 'Tu sesión ha expirado por inactividad. Por favor, inicia sesión de nuevo.',
+            variant: 'destructive'
+        });
+    }
+    
+    if (user && !isTimeout) {
         await logEvent(user, 'logout', 'user', 'User logged out.');
     }
     try {
@@ -62,11 +42,74 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
         setUser(null);
         // Redirect to login to ensure clean state
-        window.location.href = '/login';
+        if (typeof window !== 'undefined') {
+            window.location.href = '/login';
+        }
     }
-  };
+  }, [user, toast]);
 
-  const value = { user, loading, signOut };
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+        if (firebaseUser) {
+            try {
+                const appUser = await getOrCreateUser(firebaseUser.uid, firebaseUser.email);
+
+                if (appUser) {
+                    if (!user) { 
+                         await logEvent(appUser, 'login', 'user', 'User logged in successfully.');
+                    }
+                    setUser(appUser);
+                } else {
+                    await auth.signOut(); 
+                    setUser(null);
+                }
+            } catch (error) {
+                console.error("Error getting user profile, signing out:", error);
+                await auth.signOut();
+                setUser(null);
+            }
+        } else {
+            setUser(null);
+        }
+        setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+   useEffect(() => {
+    if (typeof window === 'undefined' || !user) {
+        return;
+    }
+
+    let inactivityTimer: NodeJS.Timeout;
+
+    const resetTimer = () => {
+        clearTimeout(inactivityTimer);
+        inactivityTimer = setTimeout(() => {
+            signOut(true);
+        }, INACTIVITY_TIMEOUT_MS);
+    };
+
+    const activityEvents = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'];
+    
+    activityEvents.forEach(event => {
+        window.addEventListener(event, resetTimer);
+    });
+    
+    resetTimer();
+
+    return () => {
+        clearTimeout(inactivityTimer);
+        activityEvents.forEach(event => {
+            window.removeEventListener(event, resetTimer);
+        });
+    };
+  }, [user, signOut]);
+
+
+  const value = { user, loading, signOut: () => signOut(false) };
 
   return (
     <AuthContext.Provider value={value}>
