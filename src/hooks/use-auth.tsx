@@ -23,13 +23,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
         if (firebaseUser) {
             try {
-                // Fetch the full user profile from our database
                 const appUser = await getOrCreateUser(firebaseUser.uid, firebaseUser.email);
 
-                if (appUser && !user) { // Only log event on new session creation
-                    setUser(appUser);
-                    await logEvent(appUser, 'login', 'user', 'User logged in successfully.');
-                } else if (appUser) {
+                if (appUser) {
+                    // Only log event on new session creation, check if user state is going from null to a user
+                    if (!user) { 
+                         await logEvent(appUser, 'login', 'user', 'User logged in successfully.');
+                    }
                     setUser(appUser);
                 } else {
                     // User might be disabled or not exist in our DB. Sign them out from Firebase.
@@ -49,7 +49,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     return () => unsubscribe();
-  }, [user]);
+  }, []);
 
   const signOut = async () => {
     if (user) {
