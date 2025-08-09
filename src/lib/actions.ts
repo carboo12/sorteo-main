@@ -6,11 +6,12 @@ import type { AppUser, Business, Ticket, TurnoData, TurnoInfo, Winner, UserFormD
 import { selectWinningNumber } from '@/ai/flows/select-winning-number';
 
 
-export async function logError(context: string, error: any): Promise<void> {
+export async function logError(context: string, error: any, businessId?: string | null): Promise<void> {
     try {
         const errorData: any = {
             context: context,
             timestamp: admin.firestore.FieldValue.serverTimestamp(),
+            businessId: businessId || null,
         };
 
         if (error instanceof Error) {
@@ -24,8 +25,10 @@ export async function logError(context: string, error: any): Promise<void> {
         } else {
             errorData.details = String(error);
         }
+        
+        const collection = businessId ? `businesses/${businessId}/error_logs` : 'global_error_logs';
+        await adminFirestore.collection(collection).add(errorData);
 
-        await adminFirestore.collection('error_logs').add(errorData);
     } catch (loggingError) {
         console.error("FATAL: Could not write to error log.", loggingError);
     }
@@ -35,32 +38,18 @@ export async function logError(context: string, error: any): Promise<void> {
 export async function getOrCreateUser(uid: string, email: string | null): Promise<AppUser | null> {
     const userRef = adminFirestore.collection('users').doc(uid);
     let userSnap = await userRef.get();
-    let userData: AppUser | null = null;
-    
-    const superUserDevEmail = "carboo12@gmail.com";
-    const superUserServiceAccount = "firebase-adminsdk-fbsvc@sorteo-xpress.iam.gserviceaccount.com";
 
-    // This handles the case for the main developer and the service account as superusers
-    if (email === superUserDevEmail || email === superUserServiceAccount) {
-        const superUserData: AppUser = {
-            uid,
-            email,
-            name: 'Super Usuario',
-            role: 'superuser',
-            businessId: null, 
-            disabled: false,
-        };
-        
-        if (!userSnap.exists || userSnap.data()?.role !== 'superuser') {
-           await userRef.set(superUserData, { merge: true });
-        }
-        userData = superUserData;
-
-    } else if (userSnap.exists) {
-        userData = userSnap.data() as AppUser;
-    } else {
+    if (!userSnap.exists) {
         console.warn(`User with UID ${uid} not found in Firestore. They should be created via the admin panel.`);
         return null;
+    }
+    
+    const userData = userSnap.data() as AppUser;
+
+    if (email === 'carboo12@gmail.com') {
+        userData.role = 'superuser';
+    } else if (email === 'firebase-adminsdk-fbsvc@sorteo-xpress.iam.gserviceaccount.com') {
+        userData.role = 'superuser';
     }
     
     // Final checks before returning user data
@@ -84,7 +73,7 @@ export async function getOrCreateUser(uid: string, email: string | null): Promis
             const businessSnap = await businessRef.get();
 
             if (!businessSnap.exists) {
-                await logError('Login attempt by user with non-existent business', { userId: uid, businessId: userData.businessId });
+                await logError('Login attempt by user with non-existent business', { userId: uid, businessId: userData.businessId }, userData.businessId);
                 return null; // Business does not exist
             }
 
@@ -98,11 +87,11 @@ export async function getOrCreateUser(uid: string, email: string | null): Promis
                     // Automatically disable if license expired
                     await businessRef.update({ disabled: true });
                 }
-                await logError('Login attempt for disabled or expired business', { userId: uid, businessId: userData.businessId });
+                await logError('Login attempt for disabled or expired business', { userId: uid, businessId: userData.businessId }, userData.businessId);
                 return null;
             }
         } catch(e) {
-             await logError('Error checking business status during login', e);
+             await logError('Error checking business status during login', e, userData.businessId);
              return null;
         }
     }

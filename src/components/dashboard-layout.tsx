@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useEffect } from 'react';
@@ -16,7 +17,7 @@ import {
   SidebarFooter,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { Home, Ticket, Users, LogOut, Building } from 'lucide-react';
+import { Home, Ticket, Users, LogOut, Building, Settings, ShieldAlert, History } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { Loader2 } from 'lucide-react';
 
@@ -49,7 +50,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { href: '/dashboard', label: 'Inicio', icon: <Home />, roles: ['superuser', 'admin', 'seller'] },
     { href: '/dashboard/raffle', label: 'Sorteos', icon: <Ticket />, roles: ['superuser', 'admin', 'seller'] },
     { href: '/dashboard/businesses', label: 'Negocios', icon: <Building />, roles: ['superuser'] },
-    { href: '/dashboard/users', label: 'Usuarios', icon: <Users />, roles: ['superuser', 'admin'] }
+    { href: '/dashboard/users', label: 'Usuarios', icon: <Users />, roles: ['superuser', 'admin'] },
+    { href: '/dashboard/settings', label: 'Configuración', icon: <Settings />, roles: ['superuser', 'admin'] },
+    { href: '/dashboard/error-log', label: 'Log de Errores', icon: <ShieldAlert />, roles: ['superuser', 'admin'] },
+    { href: '/dashboard/event-log', label: 'Registro de Eventos', icon: <History />, roles: ['superuser', 'admin'] }
   ];
 
   return (

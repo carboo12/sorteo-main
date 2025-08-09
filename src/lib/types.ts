@@ -66,3 +66,32 @@ export interface UserUpdateData {
     role?: 'admin' | 'seller';
     businessId?: string | null;
 }
+
+// New Types for new features
+
+export interface BusinessSettings {
+    id: string; // Should be the same as the businessId
+    exchangeRateUSDToNIO: number;
+    // Add other business-specific settings here
+}
+
+export interface EventLog {
+    id: string;
+    timestamp: string; // ISO 8601 format
+    userId: string;
+    userName: string;
+    businessId: string | null;
+    action: 'login' | 'logout' | 'create' | 'update' | 'delete';
+    entity: 'user' | 'business' | 'ticket' | 'raffle' | 'settings';
+    details: string; // e.g., "User 'admin' updated business 'Sorteo El Trébol'"
+}
+
+export interface ErrorLog {
+    id: string;
+    timestamp: string; // ISO 8601 format
+    context: string;
+    errorMessage: string;
+    stack?: string;
+    details?: string;
+    businessId?: string | null;
+}
