@@ -17,7 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { getTurnoData, buyTicket, drawWinner, getWinnerHistory } from '@/lib/actions';
 import { getCurrentTurno, cn } from '@/lib/utils';
 import type { TurnoData, Winner, TurnoInfo } from '@/lib/types';
-import { Loader2, Ticket, Trophy, User, Calendar, Clock, Sparkles } from 'lucide-react';
+import { Loader2, Ticket, Trophy, User, Calendar, Clock, Sparkles, Gift } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
@@ -101,7 +101,7 @@ export default function RaffleClient() {
     form.reset();
   };
 
-  const handleBuyTicket = async (values: z.infer<typeof buyTicketSchema>) => {
+  const handleBuyTicket = async (values: z.infer<typeof buyTicketSchema>>) => {
     if (!selectedNumber || !turnoInfo || !businessId || !user) return;
     setIsBuying(true);
     const result = await buyTicket(turnoInfo, selectedNumber, values.name || null, businessId, user);
@@ -190,7 +190,7 @@ export default function RaffleClient() {
           <Card className="shadow-lg border-2 border-primary/20 bg-card">
             <CardHeader>
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                     <CardTitle className="flex items-center gap-3">
+                     <CardTitle className="flex items-center gap-3 text-2xl">
                         <Sparkles className="text-primary" />
                         <span>Selecciona tu número</span>
                     </CardTitle>
@@ -256,6 +256,7 @@ export default function RaffleClient() {
                         <TableRow>
                             <TableHead>#</TableHead>
                             <TableHead>Ganador</TableHead>
+                            <TableHead>Premio</TableHead>
                             <TableHead>Fecha</TableHead>
                         </TableRow>
                         </TableHeader>
@@ -265,12 +266,13 @@ export default function RaffleClient() {
                             <TableRow key={index}>
                                 <TableCell className="font-bold text-primary">{winner.winningNumber}</TableCell>
                                 <TableCell>{winner.winnerName}</TableCell>
+                                <TableCell className="flex items-center gap-2"><Gift size={14} />{winner.prize}</TableCell>
                                 <TableCell className="text-xs text-muted-foreground">{winner.drawnAt}</TableCell>
                             </TableRow>
                             ))
                         ) : (
                             <TableRow>
-                            <TableCell colSpan={3} className="text-center text-muted-foreground">
+                            <TableCell colSpan={4} className="text-center text-muted-foreground">
                                 No hay ganadores todavía.
                             </TableCell>
                             </TableRow>

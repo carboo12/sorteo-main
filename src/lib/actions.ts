@@ -439,6 +439,12 @@ export async function drawWinner(turnoInfo: TurnoInfo, businessId: string, drawe
   const businessRef = adminFirestore.collection('businesses').doc(businessId);
   
   try {
+    let prizeForTurno = 'Premio no definido';
+    const settings = await getBusinessSettings(businessId);
+    if (settings && settings.prizes) {
+        prizeForTurno = settings.prizes[turnoInfo.turno] || prizeForTurno;
+    }
+
     const winningNumber = Math.floor(Math.random() * 100) + 1;
 
     if (winningNumber === undefined) {
@@ -466,6 +472,7 @@ export async function drawWinner(turnoInfo: TurnoInfo, businessId: string, drawe
       const winnerHistoryEntry: Winner = {
         winningNumber: winningNumber,
         winnerName: ticketWinner?.name || 'Sin Reclamar',
+        prize: prizeForTurno,
         drawnAt: new Date().toISOString(),
         turno: turnoInfo.turno,
         date: turnoInfo.date,
@@ -477,7 +484,7 @@ export async function drawWinner(turnoInfo: TurnoInfo, businessId: string, drawe
       });
     });
     
-    await logEvent(drawer, 'create', 'raffle', `Drew winner #${winningNumber} for turno ${turnoInfo.key}`);
+    await logEvent(drawer, 'create', 'raffle', `Drew winner #${winningNumber} for turno ${turnoInfo.key} with prize '${prizeForTurno}'`);
 
 
     return { success: true, winningNumber, message: `El número ganador es ${winningNumber}!` };
@@ -492,7 +499,11 @@ export async function getWinnerHistory(businessId: string): Promise<Winner[]> {
   const businessDoc = await adminFirestore.collection('businesses').doc(businessId).get();
   if (businessDoc.exists) {
     const data = businessDoc.data();
-    return (data?.winnerHistory || []).sort((a: Winner, b: Winner) => new Date(b.drawnAt).getTime() - new Date(a.drawnAt).getTime());
+    // Sort by date descending, then by turno (3, 2, 1)
+    return (data?.winnerHistory || []).sort((a: Winner, b: Winner) => {
+        const dateComparison = new Date(b.drawnAt).getTime() - new Date(a.drawnAt).getTime();
+        return dateComparison;
+    });
   }
   return [];
 }
@@ -516,7 +527,11 @@ export async function getBusinessSettings(businessId: string): Promise<BusinessS
                 turno2: '15:00',
                 turno3: '21:00',
             },
-            prizes: [],
+            prizes: {
+                turno1: 'Premio Mañana',
+                turno2: 'Premio Tarde',
+                turno3: 'Premio Noche',
+            },
         };
     } catch (error) {
         console.error("Error getting business settings:", error);

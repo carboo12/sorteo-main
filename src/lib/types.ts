@@ -20,6 +20,7 @@ export interface TurnoInfo {
 export interface Winner {
     winningNumber: number;
     winnerName: string;
+    prize: string;
     drawnAt: string;
     turno: string;
     date: string;
@@ -68,13 +69,8 @@ export interface UserUpdateData {
     businessId?: string | null;
 }
 
-// New Types for new features
-export interface Prize {
-    name: string;
-}
-
 export interface BusinessSettings {
-    id: string; // Should be the same as the businessId
+    id: string; 
     exchangeRateUSDToNIO: number;
     ticketPrice: number;
     drawTimes: {
@@ -82,7 +78,11 @@ export interface BusinessSettings {
         turno2: string; // "HH:mm" format
         turno3: string; // "HH:mm" format
     };
-    prizes?: Prize[];
+    prizes: {
+        turno1: string;
+        turno2: string;
+        turno3: string;
+    };
 }
 
 export interface EventLog {
