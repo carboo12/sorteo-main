@@ -24,25 +24,25 @@ const settingsSchema = z.object({
   turnos: z.object({
     turno1: z.object({
       enabled: z.boolean(),
-      drawTime: z.string(),
-      prize: z.string(),
+      drawTime: z.string().optional(),
+      prize: z.string().optional(),
     }),
     turno2: z.object({
       enabled: z.boolean(),
-      drawTime: z.string(),
-      prize: z.string(),
+      drawTime: z.string().optional(),
+      prize: z.string().optional(),
     }),
     turno3: z.object({
       enabled: z.boolean(),
-      drawTime: z.string(),
-      prize: z.string(),
+      drawTime: z.string().optional(),
+      prize: z.string().optional(),
     }),
   }),
 }).superRefine((data, ctx) => {
     const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
     
     if (data.turnos.turno1.enabled) {
-        if (!timeRegex.test(data.turnos.turno1.drawTime)) {
+        if (!data.turnos.turno1.drawTime || !timeRegex.test(data.turnos.turno1.drawTime)) {
              ctx.addIssue({
                 code: z.ZodIssueCode.custom,
                 message: "Formato de hora inválido (HH:mm).",
@@ -58,7 +58,7 @@ const settingsSchema = z.object({
         }
     }
     if (data.turnos.turno2.enabled) {
-        if (!timeRegex.test(data.turnos.turno2.drawTime)) {
+        if (!data.turnos.turno2.drawTime || !timeRegex.test(data.turnos.turno2.drawTime)) {
              ctx.addIssue({
                 code: z.ZodIssueCode.custom,
                 message: "Formato de hora inválido (HH:mm).",
@@ -74,7 +74,7 @@ const settingsSchema = z.object({
         }
     }
     if (data.turnos.turno3.enabled) {
-        if (!timeRegex.test(data.turnos.turno3.drawTime)) {
+        if (!data.turnos.turno3.drawTime || !timeRegex.test(data.turnos.turno3.drawTime)) {
              ctx.addIssue({
                 code: z.ZodIssueCode.custom,
                 message: "Formato de hora inválido (HH:mm).",
@@ -154,7 +154,12 @@ export default function SettingsPage() {
         }
         setIsSubmitting(true);
         try {
-            const result = await updateBusinessSettings(user.businessId, data, user);
+            // Ensure prize is empty string if not provided for enabled turnos, to avoid DB inconsistencies
+            if (data.turnos.turno1.enabled && !data.turnos.turno1.prize) data.turnos.turno1.prize = '';
+            if (data.turnos.turno2.enabled && !data.turnos.turno2.prize) data.turnos.turno2.prize = '';
+            if (data.turnos.turno3.enabled && !data.turnos.turno3.prize) data.turnos.turno3.prize = '';
+
+            const result = await updateBusinessSettings(user.businessId, data as BusinessSettings, user);
             if (result.success) {
                 toast({ title: '¡Éxito!', description: 'La configuración se ha guardado correctamente.' });
                  form.reset(data, { keepIsDirty: false });
@@ -312,10 +317,10 @@ export default function SettingsPage() {
                                         />
                                         <div className="grid sm:grid-cols-2 gap-6">
                                             <FormField control={form.control} name="turnos.turno1.drawTime" render={({ field }) => (
-                                                <FormItem><FormLabel>Hora del Sorteo</FormLabel><FormControl><Input type="time" {...field} disabled={!form.watch('turnos.turno1.enabled')} /></FormControl><FormMessage /></FormItem>
+                                                <FormItem><FormLabel>Hora del Sorteo</FormLabel><FormControl><Input type="time" {...field} value={field.value ?? ""} disabled={!form.watch('turnos.turno1.enabled')} /></FormControl><FormMessage /></FormItem>
                                             )}/>
                                             <FormField control={form.control} name="turnos.turno1.prize" render={({ field }) => (
-                                                <FormItem><FormLabel>Premio</FormLabel><FormControl><Input placeholder="Ej: 100 Córdobas" {...field} disabled={!form.watch('turnos.turno1.enabled')} /></FormControl><FormMessage /></FormItem>
+                                                <FormItem><FormLabel>Premio</FormLabel><FormControl><Input placeholder="Ej: 100 Córdobas" {...field} value={field.value ?? ""} disabled={!form.watch('turnos.turno1.enabled')} /></FormControl><FormMessage /></FormItem>
                                             )}/>
                                         </div>
                                     </div>
@@ -339,10 +344,10 @@ export default function SettingsPage() {
                                         />
                                         <div className="grid sm:grid-cols-2 gap-6">
                                             <FormField control={form.control} name="turnos.turno2.drawTime" render={({ field }) => (
-                                                <FormItem><FormLabel>Hora del Sorteo</FormLabel><FormControl><Input type="time" {...field} disabled={!form.watch('turnos.turno2.enabled')} /></FormControl><FormMessage /></FormItem>
+                                                <FormItem><FormLabel>Hora del Sorteo</FormLabel><FormControl><Input type="time" {...field} value={field.value ?? ""} disabled={!form.watch('turnos.turno2.enabled')} /></FormControl><FormMessage /></FormItem>
                                             )}/>
                                             <FormField control={form.control} name="turnos.turno2.prize" render={({ field }) => (
-                                                <FormItem><FormLabel>Premio</FormLabel><FormControl><Input placeholder="Ej: Canasta Básica" {...field} disabled={!form.watch('turnos.turno2.enabled')} /></FormControl><FormMessage /></FormItem>
+                                                <FormItem><FormLabel>Premio</FormLabel><FormControl><Input placeholder="Ej: Canasta Básica" {...field} value={field.value ?? ""} disabled={!form.watch('turnos.turno2.enabled')} /></FormControl><FormMessage /></FormItem>
                                             )}/>
                                         </div>
                                     </div>
@@ -366,10 +371,10 @@ export default function SettingsPage() {
                                         />
                                         <div className="grid sm:grid-cols-2 gap-6">
                                             <FormField control={form.control} name="turnos.turno3.drawTime" render={({ field }) => (
-                                                <FormItem><FormLabel>Hora del Sorteo</FormLabel><FormControl><Input type="time" {...field} disabled={!form.watch('turnos.turno3.enabled')} /></FormControl><FormMessage /></FormItem>
+                                                <FormItem><FormLabel>Hora del Sorteo</FormLabel><FormControl><Input type="time" {...field} value={field.value ?? ""} disabled={!form.watch('turnos.turno3.enabled')} /></FormControl><FormMessage /></FormItem>
                                             )}/>
                                             <FormField control={form.control} name="turnos.turno3.prize" render={({ field }) => (
-                                                <FormItem><FormLabel>Premio</FormLabel><FormControl><Input placeholder="Ej: Recarga 50 C$" {...field} disabled={!form.watch('turnos.turno3.enabled')} /></FormControl><FormMessage /></FormItem>
+                                                <FormItem><FormLabel>Premio</FormLabel><FormControl><Input placeholder="Ej: Recarga 50 C$" {...field} value={field.value ?? ""} disabled={!form.watch('turnos.turno3.enabled')} /></FormControl><FormMessage /></FormItem>
                                             )}/>
                                         </div>
                                     </div>
@@ -390,3 +395,5 @@ export default function SettingsPage() {
         </DashboardLayout>
     );
 }
+
+    
