@@ -14,58 +14,64 @@ interface AuthContextType {
   signOut: () => void;
 }
 
+const USER_KEY = 'app_user';
+
 const AuthContext = createContext<AuthContextType>({ user: null, loading: true, signOut: () => {} });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<AppUser | null>(() => getCurrentUser());
+  const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const localUser = getCurrentUser();
-    if (localUser) {
-        setUser(localUser);
-    }
-    setLoading(false); // Initial check done, no longer loading.
-
+    // This is the master listener. It determines the auth state.
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
-        const currentLocalUser = getCurrentUser();
-        if (currentLocalUser && currentLocalUser.role === 'superuser') {
-            setUser(currentLocalUser);
-            setLoading(false);
-            return;
-        }
+        // Check if a local user (especially superuser) exists.
+        const localUser = getCurrentUser();
 
+        // If firebase user exists, they are the source of truth (unless a superuser is logged in).
         if (firebaseUser) {
-            try {
-                const appUser = await getOrCreateUser(firebaseUser.uid, firebaseUser.email);
-                if (appUser) {
-                    if (!currentLocalUser || JSON.stringify(appUser) !== JSON.stringify(currentLocalUser)) {
-                        localLogin(appUser);
+             if (localUser?.role === 'superuser') {
+                setUser(localUser);
+            } else {
+                try {
+                    const appUser = await getOrCreateUser(firebaseUser.uid, firebaseUser.email);
+                    if (appUser) {
+                        localLogin(appUser); // Sync local storage
                         setUser(appUser);
+                    } else {
+                        // User exists in Firebase but not in our DB or is disabled. Sign them out.
+                        await auth.signOut(); 
+                        setUser(null);
+                        localSignOut();
                     }
-                } else {
+                } catch (error) {
+                    console.error("Error getting user profile, signing out:", error);
                     await auth.signOut();
+                    setUser(null);
+                    localSignOut();
                 }
-            } catch (error) {
-                console.error("Error getting user profile, signing out:", error);
-                await auth.signOut();
             }
         } else {
-             // If no firebase user, but we have a non-superuser local user, sign out.
-            if (currentLocalUser && currentLocalUser.role !== 'superuser') {
-                localSignOut();
+            // No firebase user. Is there a local superuser?
+             if (localUser?.role === 'superuser') {
+                setUser(localUser);
+            } else {
+                // No firebase user and no superuser. Clear everything.
                 setUser(null);
+                localSignOut();
             }
         }
         setLoading(false);
     });
 
+    // Also handle changes from other tabs
     const handleStorageChange = (event: StorageEvent) => {
         if (event.key === USER_KEY) {
             window.location.reload();
         }
     };
     window.addEventListener('storage', handleStorageChange);
+
 
     return () => {
         unsubscribe();
@@ -74,12 +80,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signOut = async () => {
-    setLoading(true);
-    await auth.signOut().catch(console.error); 
     localSignOut();
+    await auth.signOut().catch(console.error); 
     setUser(null);
     window.location.href = '/login';
-    setLoading(false);
   };
 
   const value = { user, loading, signOut };
