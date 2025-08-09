@@ -49,10 +49,10 @@ const settingsSchema = z.object({
                 path: ["turnos", "turno1", "drawTime"],
             });
         }
-        if (data.turnos.turno1.prize.length < 1) {
+        if (!data.turnos.turno1.prize || data.turnos.turno1.prize.trim().length < 1) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
-                message: "El premio es obligatorio.",
+                message: "El premio es obligatorio si el turno está habilitado.",
                 path: ["turnos", "turno1", "prize"],
             });
         }
@@ -65,10 +65,10 @@ const settingsSchema = z.object({
                 path: ["turnos", "turno2", "drawTime"],
             });
         }
-        if (data.turnos.turno2.prize.length < 1) {
+        if (!data.turnos.turno2.prize || data.turnos.turno2.prize.trim().length < 1) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
-                message: "El premio es obligatorio.",
+                message: "El premio es obligatorio si el turno está habilitado.",
                 path: ["turnos", "turno2", "prize"],
             });
         }
@@ -81,10 +81,10 @@ const settingsSchema = z.object({
                 path: ["turnos", "turno3", "drawTime"],
             });
         }
-        if (data.turnos.turno3.prize.length < 1) {
+        if (!data.turnos.turno3.prize || data.turnos.turno3.prize.trim().length < 1) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
-                message: "El premio es obligatorio.",
+                message: "El premio es obligatorio si el turno está habilitado.",
                 path: ["turnos", "turno3", "prize"],
             });
         }
