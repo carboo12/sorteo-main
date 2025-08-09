@@ -9,27 +9,45 @@ import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Loader2, DollarSign, Clock, AlertCircle, Gift } from "lucide-react";
+import { Loader2, DollarSign, Clock, AlertCircle, Gift, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/use-auth';
 import { getBusinessSettings, updateBusinessSettings } from '@/lib/actions';
 import type { BusinessSettings } from '@/lib/types';
 import DashboardLayout from '@/components/dashboard-layout';
+import { Switch } from '@/components/ui/switch';
+import { Separator } from '@/components/ui/separator';
 
 const settingsSchema = z.object({
   exchangeRateUSDToNIO: z.coerce.number().positive({ message: "La tasa de cambio debe ser un número positivo." }),
   ticketPrice: z.coerce.number().min(0, { message: "El precio del número no puede ser negativo." }),
-  drawTimes: z.object({
-    turno1: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, { message: "Formato de hora inválido (HH:mm)."}),
-    turno2: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, { message: "Formato de hora inválido (HH:mm)."}),
-    turno3: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, { message: "Formato de hora inválido (HH:mm)."}),
+  turnos: z.object({
+    turno1: z.object({
+      enabled: z.boolean(),
+      drawTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, { message: "Formato de hora inválido (HH:mm)."}),
+      prize: z.string().min(1, "El premio es obligatorio si el turno está habilitado."),
+    }),
+    turno2: z.object({
+      enabled: z.boolean(),
+      drawTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, { message: "Formato de hora inválido (HH:mm)."}),
+      prize: z.string().min(1, "El premio es obligatorio si el turno está habilitado."),
+    }),
+    turno3: z.object({
+      enabled: z.boolean(),
+      drawTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, { message: "Formato de hora inválido (HH:mm)."}),
+      prize: z.string().min(1, "El premio es obligatorio si el turno está habilitado."),
+    }),
   }),
-  prizes: z.object({
-      turno1: z.string().min(1, "El premio para el Turno Mañana es obligatorio."),
-      turno2: z.string().min(1, "El premio para el Turno Tarde es obligatorio."),
-      turno3: z.string().min(1, "El premio para el Turno Noche es obligatorio."),
-  }),
+}).refine(data => {
+    if (data.turnos.turno1.enabled && !data.turnos.turno1.prize) return false;
+    if (data.turnos.turno2.enabled && !data.turnos.turno2.prize) return false;
+    if (data.turnos.turno3.enabled && !data.turnos.turno3.prize) return false;
+    return true;
+}, {
+    message: "El premio no puede estar vacío para un turno habilitado.",
+    path: ['turnos'], 
 });
+
 
 type SettingsFormValues = z.infer<typeof settingsSchema>;
 
@@ -44,15 +62,10 @@ export default function SettingsPage() {
         defaultValues: {
             exchangeRateUSDToNIO: 0,
             ticketPrice: 0,
-            drawTimes: {
-                turno1: '11:00',
-                turno2: '15:00',
-                turno3: '21:00',
-            },
-            prizes: {
-                turno1: '',
-                turno2: '',
-                turno3: '',
+            turnos: {
+                turno1: { enabled: true, drawTime: '11:00', prize: '' },
+                turno2: { enabled: true, drawTime: '15:00', prize: '' },
+                turno3: { enabled: true, drawTime: '21:00', prize: '' },
             },
         }
     });
@@ -74,8 +87,7 @@ export default function SettingsPage() {
                         form.reset({
                             exchangeRateUSDToNIO: settings.exchangeRateUSDToNIO,
                             ticketPrice: settings.ticketPrice,
-                            drawTimes: settings.drawTimes,
-                            prizes: settings.prizes || { turno1: '', turno2: '', turno3: ''},
+                            turnos: settings.turnos
                         });
                     }
                 } catch (error) {
@@ -232,108 +244,93 @@ export default function SettingsPage() {
                                     <div className="flex items-start gap-4">
                                         <Clock className="h-8 w-8 text-primary mt-1" />
                                         <div className='flex-1'>
-                                            <h3 className="text-lg font-semibold">Horarios de Sorteos</h3>
-                                            <p className="text-sm text-muted-foreground">Establece la hora de cierre para cada turno.</p>
+                                            <h3 className="text-lg font-semibold">Gestión de Turnos y Premios</h3>
+                                            <p className="text-sm text-muted-foreground">Habilita o deshabilita turnos, y define sus horarios y premios.</p>
                                         </div>
                                     </div>
                                 </CardHeader>
-                                <CardContent>
-                                    <div className="grid sm:grid-cols-3 gap-6 pl-12">
+                                <CardContent className="space-y-6 pl-12">
+                                     {/* Turno 1 */}
+                                    <div className="space-y-4 p-4 rounded-md border">
                                         <FormField
                                             control={form.control}
-                                            name="drawTimes.turno1"
+                                            name="turnos.turno1.enabled"
                                             render={({ field }) => (
-                                                <FormItem>
-                                                <FormLabel>Turno Mañana</FormLabel>
-                                                <FormControl>
-                                                    <Input type="time" {...field} />
-                                                </FormControl>
-                                                <FormMessage />
+                                                <FormItem className="flex flex-row items-center justify-between">
+                                                    <div className='space-y-0.5'>
+                                                        <FormLabel className="text-base">Turno Mañana</FormLabel>
+                                                        <FormDescription>Habilitar o deshabilitar este turno.</FormDescription>
+                                                    </div>
+                                                    <FormControl>
+                                                        <Switch checked={field.value} onCheckedChange={field.onChange} />
+                                                    </FormControl>
                                                 </FormItem>
                                             )}
                                         />
-                                        <FormField
-                                            control={form.control}
-                                            name="drawTimes.turno2"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                <FormLabel>Turno Tarde</FormLabel>
-                                                <FormControl>
-                                                    <Input type="time" {...field} />
-                                                </FormControl>
-                                                <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                        <FormField
-                                            control={form.control}
-                                            name="drawTimes.turno3"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                <FormLabel>Turno Noche</FormLabel>
-                                                <FormControl>
-                                                    <Input type="time" {...field} />
-                                                </FormControl>
-                                                <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
+                                        <div className="grid sm:grid-cols-2 gap-6">
+                                            <FormField control={form.control} name="turnos.turno1.drawTime" render={({ field }) => (
+                                                <FormItem><FormLabel>Hora del Sorteo</FormLabel><FormControl><Input type="time" {...field} disabled={!form.watch('turnos.turno1.enabled')} /></FormControl><FormMessage /></FormItem>
+                                            )}/>
+                                            <FormField control={form.control} name="turnos.turno1.prize" render={({ field }) => (
+                                                <FormItem><FormLabel>Premio</FormLabel><FormControl><Input placeholder="Ej: 100 Córdobas" {...field} disabled={!form.watch('turnos.turno1.enabled')} /></FormControl><FormMessage /></FormItem>
+                                            )}/>
+                                        </div>
                                     </div>
-                                </CardContent>
-                            </Card>
 
-                            <Card>
-                                <CardHeader>
-                                     <div className="flex items-start gap-4">
-                                        <Gift className="h-8 w-8 text-primary mt-1" />
-                                        <div className='flex-1'>
-                                            <h3 className="text-lg font-semibold">Gestión de Premios</h3>
-                                            <p className="text-sm text-muted-foreground">Asigna un premio específico para cada turno del sorteo.</p>
+                                     {/* Turno 2 */}
+                                     <div className="space-y-4 p-4 rounded-md border">
+                                        <FormField
+                                            control={form.control}
+                                            name="turnos.turno2.enabled"
+                                            render={({ field }) => (
+                                                <FormItem className="flex flex-row items-center justify-between">
+                                                    <div className='space-y-0.5'>
+                                                        <FormLabel className="text-base">Turno Tarde</FormLabel>
+                                                        <FormDescription>Habilitar o deshabilitar este turno.</FormDescription>
+                                                    </div>
+                                                    <FormControl>
+                                                        <Switch checked={field.value} onCheckedChange={field.onChange} />
+                                                    </FormControl>
+                                                </FormItem>
+                                            )}
+                                        />
+                                        <div className="grid sm:grid-cols-2 gap-6">
+                                            <FormField control={form.control} name="turnos.turno2.drawTime" render={({ field }) => (
+                                                <FormItem><FormLabel>Hora del Sorteo</FormLabel><FormControl><Input type="time" {...field} disabled={!form.watch('turnos.turno2.enabled')} /></FormControl><FormMessage /></FormItem>
+                                            )}/>
+                                            <FormField control={form.control} name="turnos.turno2.prize" render={({ field }) => (
+                                                <FormItem><FormLabel>Premio</FormLabel><FormControl><Input placeholder="Ej: Canasta Básica" {...field} disabled={!form.watch('turnos.turno2.enabled')} /></FormControl><FormMessage /></FormItem>
+                                            )}/>
                                         </div>
                                     </div>
-                                </CardHeader>
-                                <CardContent>
-                                     <div className="grid sm:grid-cols-3 gap-6 pl-12">
+                                    
+                                     {/* Turno 3 */}
+                                     <div className="space-y-4 p-4 rounded-md border">
                                         <FormField
                                             control={form.control}
-                                            name="prizes.turno1"
+                                            name="turnos.turno3.enabled"
                                             render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Premio Turno Mañana</FormLabel>
+                                                <FormItem className="flex flex-row items-center justify-between">
+                                                    <div className='space-y-0.5'>
+                                                        <FormLabel className="text-base">Turno Noche</FormLabel>
+                                                        <FormDescription>Habilitar o deshabilitar este turno.</FormDescription>
+                                                    </div>
                                                     <FormControl>
-                                                        <Input placeholder="Ej: 100 Córdobas" {...field} />
+                                                        <Switch checked={field.value} onCheckedChange={field.onChange} />
                                                     </FormControl>
-                                                    <FormMessage />
                                                 </FormItem>
                                             )}
                                         />
-                                        <FormField
-                                            control={form.control}
-                                            name="prizes.turno2"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Premio Turno Tarde</FormLabel>
-                                                    <FormControl>
-                                                        <Input placeholder="Ej: Canasta Básica" {...field} />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                        <FormField
-                                            control={form.control}
-                                            name="prizes.turno3"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Premio Turno Noche</FormLabel>
-                                                    <FormControl>
-                                                        <Input placeholder="Ej: Recarga 50 C$" {...field} />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                     </div>
+                                        <div className="grid sm:grid-cols-2 gap-6">
+                                            <FormField control={form.control} name="turnos.turno3.drawTime" render={({ field }) => (
+                                                <FormItem><FormLabel>Hora del Sorteo</FormLabel><FormControl><Input type="time" {...field} disabled={!form.watch('turnos.turno3.enabled')} /></FormControl><FormMessage /></FormItem>
+                                            )}/>
+                                            <FormField control={form.control} name="turnos.turno3.prize" render={({ field }) => (
+                                                <FormItem><FormLabel>Premio</FormLabel><FormControl><Input placeholder="Ej: Recarga 50 C$" {...field} disabled={!form.watch('turnos.turno3.enabled')} /></FormControl><FormMessage /></FormItem>
+                                            )}/>
+                                        </div>
+                                    </div>
+
                                 </CardContent>
                             </Card>
                         </div>

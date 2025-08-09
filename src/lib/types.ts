@@ -79,15 +79,10 @@ export interface BusinessSettings {
     id: string; 
     exchangeRateUSDToNIO: number;
     ticketPrice: number;
-    drawTimes: {
-        turno1: string; // "HH:mm" format
-        turno2: string; // "HH:mm" format
-        turno3: string; // "HH:mm" format
-    };
-    prizes: {
-        turno1: string;
-        turno2: string;
-        turno3: string;
+    turnos: {
+        turno1: { enabled: boolean; drawTime: string; prize: string; };
+        turno2: { enabled: boolean; drawTime: string; prize: string; };
+        turno3: { enabled: boolean; drawTime: string; prize: string; };
     };
 }
 

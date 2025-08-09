@@ -432,8 +432,8 @@ export async function drawWinner(turnoInfo: TurnoInfo, businessId: string, drawe
   try {
     let prizeForTurno = 'Premio no definido';
     const settings = await getBusinessSettings(businessId);
-    if (settings && settings.prizes) {
-        prizeForTurno = settings.prizes[turnoInfo.turno] || prizeForTurno;
+    if (settings && settings.turnos) {
+        prizeForTurno = settings.turnos[turnoInfo.turno].prize || prizeForTurno;
     }
 
     const winningNumber = Math.floor(Math.random() * 100) + 1;
@@ -512,15 +512,10 @@ export async function getBusinessSettings(businessId: string): Promise<BusinessS
             id: businessId,
             exchangeRateUSDToNIO: 36.5,
             ticketPrice: 10,
-            drawTimes: {
-                turno1: '11:00',
-                turno2: '15:00',
-                turno3: '21:00',
-            },
-            prizes: {
-                turno1: 'Premio Mañana',
-                turno2: 'Premio Tarde',
-                turno3: 'Premio Noche',
+            turnos: {
+                turno1: { enabled: true, drawTime: '11:00', prize: 'Premio Mañana' },
+                turno2: { enabled: true, drawTime: '15:00', prize: 'Premio Tarde' },
+                turno3: { enabled: true, drawTime: '21:00', prize: 'Premio Noche' },
             },
         };
     } catch (error) {

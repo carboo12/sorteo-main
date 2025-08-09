@@ -14,10 +14,10 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { getTurnoData, buyTicket, drawWinner, getWinnerHistory, getBusinessById } from '@/lib/actions';
+import { getTurnoData, buyTicket, drawWinner, getWinnerHistory, getBusinessById, getBusinessSettings } from '@/lib/actions';
 import { getCurrentTurno, cn } from '@/lib/utils';
-import type { TurnoData, Winner, TurnoInfo, Ticket, Business } from '@/lib/types';
-import { Loader2, Ticket as TicketIcon, Trophy, User, Calendar, Clock, Sparkles, Gift, Printer } from 'lucide-react';
+import type { TurnoData, Winner, TurnoInfo, Ticket, Business, BusinessSettings } from '@/lib/types';
+import { Loader2, Ticket as TicketIcon, Trophy, User, Calendar, Clock, Sparkles, Gift, Printer, Ban } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
@@ -36,6 +36,7 @@ export default function RaffleClient() {
   const [turnoData, setTurnoData] = useState<TurnoData>({ tickets: [] });
   const [winnerHistory, setWinnerHistory] = useState<Winner[]>([]);
   const [business, setBusiness] = useState<Business | null>(null);
+  const [settings, setSettings] = useState<BusinessSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isBuying, setIsBuying] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -64,14 +65,16 @@ export default function RaffleClient() {
     try {
       const currentTurno = getCurrentTurno();
       setTurnoInfo(currentTurno);
-      const [data, history, businessData] = await Promise.all([
+      const [data, history, businessData, settingsData] = await Promise.all([
         getTurnoData(currentTurno, businessId),
         getWinnerHistory(businessId),
         getBusinessById(businessId),
+        getBusinessSettings(businessId),
       ]);
       setTurnoData(data);
       setWinnerHistory(history);
       setBusiness(businessData);
+      setSettings(settingsData);
     } catch (error) {
       toast({
         variant: 'destructive',
@@ -110,7 +113,7 @@ export default function RaffleClient() {
     form.reset();
   };
 
-  const handleBuyTicket = async (values: z.infer<typeof buyTicketSchema>) => {
+  const handleBuyTicket = async (values: z.infer<typeof buyTicketSchema>>) => {
     if (!selectedNumber || !turnoInfo || !businessId || !user) return;
     setIsBuying(true);
     
@@ -191,7 +194,7 @@ export default function RaffleClient() {
   };
   
   const canDraw = userRole === 'admin' || userRole === 'superuser';
-
+  const isCurrentTurnoEnabled = turnoInfo && settings ? settings.turnos[turnoInfo.turno].enabled : false;
 
   if (authLoading || (isLoading && businessId)) {
     return (
@@ -235,6 +238,15 @@ export default function RaffleClient() {
                 </div>
             </CardHeader>
             <CardContent>
+              {!isCurrentTurnoEnabled ? (
+                 <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-lg text-center min-h-[300px]">
+                    <Ban className="h-16 w-16 text-muted-foreground mb-4" />
+                    <h3 className="text-xl font-semibold">Turno Deshabilitado</h3>
+                    <p className="text-muted-foreground">
+                        El sorteo para este turno no está activo en este momento.
+                    </p>
+                </div>
+              ) : (
                 <div className="grid grid-cols-10 gap-2">
                   {Array.from({ length: 100 }, (_, i) => i + 1).map((number) => {
                     const isSold = soldNumbers.has(number);
@@ -259,8 +271,9 @@ export default function RaffleClient() {
                     );
                   })}
                 </div>
+                )}
             </CardContent>
-             {canDraw && (
+             {canDraw && isCurrentTurnoEnabled && (
                 <CardFooter className="pt-6 justify-center">
                     <Button
                         size="lg"
@@ -298,7 +311,7 @@ export default function RaffleClient() {
                             <TableRow key={index}>
                                 <TableCell className="font-bold text-primary">{winner.winningNumber}</TableCell>
                                 <TableCell>{winner.winnerName}</TableCell>
-                                <TableCell className="flex items-center gap-2"><Gift size={14} />{winner.prize}</TableCell>
+                                <TableCell className="flex items-center gap-2 text-xs"><Gift size={14} />{winner.prize}</TableCell>
                                 <TableCell className="text-xs text-muted-foreground">{winner.drawnAt}</TableCell>
                             </TableRow>
                             ))
