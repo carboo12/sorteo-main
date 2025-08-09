@@ -397,8 +397,7 @@ export async function getTurnoData(turnoInfo: TurnoInfo, businessId: string): Pr
 
 export async function buyTicket(
   turnoInfo: TurnoInfo,
-  number: number,
-  name: string | null,
+  ticket: Ticket,
   businessId: string,
   buyer: AppUser,
 ): Promise<{ success: boolean; message: string }> {
@@ -410,21 +409,16 @@ export async function buyTicket(
             const doc = await transaction.get(docRef);
             const data = doc.exists ? doc.data() as TurnoData : { tickets: [] };
             const tickets = data.tickets || [];
-            if (tickets.some((t: Ticket) => t.number === number)) {
-                throw new Error(`El número ${number} ya ha sido vendido.`);
+            if (tickets.some((t: Ticket) => t.number === ticket.number)) {
+                throw new Error(`El número ${ticket.number} ya ha sido vendido.`);
             }
-            const newTicket: Ticket = { 
-                number, 
-                name: name || 'Anónimo', 
-                purchasedAt: new Date().toISOString() 
-            };
-            tickets.push(newTicket);
+            tickets.push(ticket);
             transaction.set(docRef, { ...data, tickets }, { merge: true });
         });
         
-        await logEvent(buyer, 'create', 'ticket', `Sold ticket #${number} for turno ${turnoInfo.key}`);
+        await logEvent(buyer, 'create', 'ticket', `Sold ticket #${ticket.number} for turno ${turnoInfo.key}`);
 
-        return { success: true, message: `¡Número ${number} comprado con éxito!` };
+        return { success: true, message: `¡Número ${ticket.number} comprado con éxito!` };
     } catch (error: any) {
         return { success: false, message: error.message };
     }

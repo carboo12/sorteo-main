@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import {
@@ -14,16 +14,17 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { getTurnoData, buyTicket, drawWinner, getWinnerHistory } from '@/lib/actions';
+import { getTurnoData, buyTicket, drawWinner, getWinnerHistory, getBusinessById } from '@/lib/actions';
 import { getCurrentTurno, cn } from '@/lib/utils';
-import type { TurnoData, Winner, TurnoInfo } from '@/lib/types';
-import { Loader2, Ticket, Trophy, User, Calendar, Clock, Sparkles, Gift } from 'lucide-react';
+import type { TurnoData, Winner, TurnoInfo, Ticket, Business } from '@/lib/types';
+import { Loader2, Ticket as TicketIcon, Trophy, User, Calendar, Clock, Sparkles, Gift, Printer } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useAuth } from '@/hooks/use-auth';
+import TicketReceipt from '@/components/ticket-receipt';
 
 const buyTicketSchema = z.object({
   name: z.string().optional(),
@@ -34,14 +35,20 @@ export default function RaffleClient() {
   const [turnoInfo, setTurnoInfo] = useState<TurnoInfo | null>(null);
   const [turnoData, setTurnoData] = useState<TurnoData>({ tickets: [] });
   const [winnerHistory, setWinnerHistory] = useState<Winner[]>([]);
+  const [business, setBusiness] = useState<Business | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isBuying, setIsBuying] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
   const [isSpinning, setIsSpinning] = useState(false);
   const [highlightedNumber, setHighlightedNumber] = useState<number | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isPurchaseDialogOpen, setIsPurchaseDialogOpen] = useState(false);
+  const [isReceiptDialogOpen, setIsReceiptDialogOpen] = useState(false);
+  const [lastSoldTicket, setLastSoldTicket] = useState<Ticket | null>(null);
   const [selectedNumber, setSelectedNumber] = useState<number | null>(null);
   const { toast } = useToast();
+  
+  const receiptRef = useRef<HTMLDivElement>(null);
+
 
   const form = useForm<z.infer<typeof buyTicketSchema>>({
     resolver: zodResolver(buyTicketSchema),
@@ -57,12 +64,14 @@ export default function RaffleClient() {
     try {
       const currentTurno = getCurrentTurno();
       setTurnoInfo(currentTurno);
-      const [data, history] = await Promise.all([
+      const [data, history, businessData] = await Promise.all([
         getTurnoData(currentTurno, businessId),
         getWinnerHistory(businessId),
+        getBusinessById(businessId),
       ]);
       setTurnoData(data);
       setWinnerHistory(history);
+      setBusiness(businessData);
     } catch (error) {
       toast({
         variant: 'destructive',
@@ -97,25 +106,48 @@ export default function RaffleClient() {
   const handleSelectNumber = (number: number) => {
     if (soldNumbers.has(number) || turnoData.winningNumber) return;
     setSelectedNumber(number);
-    setIsDialogOpen(true);
+    setIsPurchaseDialogOpen(true);
     form.reset();
   };
 
   const handleBuyTicket = async (values: z.infer<typeof buyTicketSchema>) => {
     if (!selectedNumber || !turnoInfo || !businessId || !user) return;
     setIsBuying(true);
-    const result = await buyTicket(turnoInfo, selectedNumber, values.name || null, businessId, user);
+    
+    const newTicket: Ticket = { 
+        number: selectedNumber, 
+        name: values.name || 'Anónimo', 
+        purchasedAt: new Date().toISOString() 
+    };
+
+    const result = await buyTicket(turnoInfo, newTicket, businessId, user);
+
     if (result.success) {
       toast({ title: '¡Éxito!', description: result.message });
       setTurnoData((prev) => ({
         ...prev,
-        tickets: [...prev.tickets, { number: selectedNumber, name: values.name || 'Anónimo', purchasedAt: new Date().toISOString() }],
+        tickets: [...prev.tickets, newTicket],
       }));
-      setIsDialogOpen(false);
+      setLastSoldTicket(newTicket);
+      setIsPurchaseDialogOpen(false);
+      setIsReceiptDialogOpen(true);
     } else {
       toast({ variant: 'destructive', title: 'Error', description: result.message });
     }
     setIsBuying(false);
+  };
+  
+  const handlePrint = () => {
+    const printContents = receiptRef.current?.innerHTML;
+    const originalContents = document.body.innerHTML;
+
+    if (printContents) {
+      document.body.innerHTML = printContents;
+      window.print();
+      document.body.innerHTML = originalContents;
+      // We need to reload to re-attach React event listeners
+      window.location.reload(); 
+    }
   };
   
   const runTumbleEffect = async () => {
@@ -285,7 +317,8 @@ export default function RaffleClient() {
         </div>
       </div>
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      {/* Purchase Dialog */}
+      <Dialog open={isPurchaseDialogOpen} onOpenChange={setIsPurchaseDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Comprar Número <span className="text-primary font-black">{selectedNumber}</span></DialogTitle>
@@ -312,14 +345,45 @@ export default function RaffleClient() {
                 )}
               />
               <DialogFooter>
-                <Button type="button" variant="ghost" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
+                <Button type="button" variant="ghost" onClick={() => setIsPurchaseDialogOpen(false)}>Cancelar</Button>
                 <Button type="submit" disabled={isBuying}>
-                  {isBuying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Ticket className="mr-2 h-4 w-4" />}
+                  {isBuying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <TicketIcon className="mr-2 h-4 w-4" />}
                   Comprar Número
                 </Button>
               </DialogFooter>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Receipt Dialog */}
+       <Dialog open={isReceiptDialogOpen} onOpenChange={setIsReceiptDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Compra Exitosa</DialogTitle>
+             <DialogDescription>
+                El número ha sido registrado. Puedes imprimir un recibo.
+             </DialogDescription>
+          </DialogHeader>
+          
+          <div className="my-4">
+             {business && turnoInfo && lastSoldTicket && (
+                <TicketReceipt 
+                    ref={receiptRef}
+                    businessName={business.name}
+                    turnoInfo={turnoInfo}
+                    ticket={lastSoldTicket}
+                />
+             )}
+          </div>
+          
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setIsReceiptDialogOpen(false)}>Cerrar</Button>
+            <Button type="button" onClick={handlePrint}>
+                <Printer className="mr-2 h-4 w-4" />
+                Imprimir Ticket
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
