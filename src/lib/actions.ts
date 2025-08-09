@@ -36,60 +36,45 @@ export async function getOrCreateUser(uid: string, email: string | null): Promis
     const userRef = adminFirestore.collection('users').doc(uid);
     let userSnap = await userRef.get();
     let userData: AppUser | null = null;
+    
+    // Special check for the superuser developer account
+    const superUserEmail = "firebase-adminsdk-fbsvc@sorteo-xpress.iam.gserviceaccount.com";
 
-    if (userSnap.exists) {
-        userData = userSnap.data() as AppUser;
-    } else if (email) {
-        // Check if a user with this email was pre-registered in 'users' collection
-        // This is common when an admin creates a user before they log in for the first time.
-        const userQuery = adminFirestore.collection('users').where('email', '==', email);
-        const querySnap = await userQuery.get();
+    if (email === superUserEmail) {
+        // This is the superuser, ensure their document is correct.
+        const superUserData: AppUser = {
+            uid,
+            email,
+            name: 'Super Usuario',
+            role: 'superuser',
+            businessId: null, // Superuser is not tied to a business
+            disabled: false,
+        };
         
-        if (!querySnap.empty) {
-            // A pre-existing record was found for this email.
-            // This can happen if an admin created the user, which creates a Firestore doc
-            // but the UID was not known yet. Now we can consolidate them.
-            const oldUserDoc = querySnap.docs[0];
-            const oldUserData = oldUserDoc.data();
-            
-            // Create the definitive user data with the correct UID from Firebase Auth.
-            const newUserData: AppUser = {
-                uid, // The real Firebase Auth UID
-                email,
-                name: oldUserData.name || 'Usuario',
-                role: oldUserData.role || 'seller',
-                businessId: oldUserData.businessId || null,
-                createdBy: oldUserData.createdBy || null,
-                disabled: oldUserData.disabled || false,
-            };
-
-            // Set the data under the correct UID document
-            await userRef.set(newUserData);
-            
-            // If the old doc had a different, temporary ID, delete it to avoid duplicates.
-            if (oldUserDoc.id !== uid) {
-                await oldUserDoc.ref.delete();
-            }
-
-            userData = newUserData;
+        if (!userSnap.exists || JSON.stringify(userSnap.data()) !== JSON.stringify(superUserData)) {
+           await userRef.set(superUserData, { merge: true });
         }
-    }
+        userData = superUserData;
 
-    if (!userData) {
-        console.warn(`User with UID ${uid} not found in Firestore and could not be created.`);
+    } else if (userSnap.exists) {
+        userData = userSnap.data() as AppUser;
+    } else {
+        console.warn(`User with UID ${uid} not found in Firestore.`);
+        // Don't create a new user here, they should be created via the createUser function by an admin.
+        // This prevents random sign-ups.
         return null;
     }
     
     // Final checks before returning user data
 
     // Check if user is disabled in Firestore
-    if (userData.disabled) {
+    if (userData?.disabled) {
         await logError('Login attempt by disabled user', { userId: uid });
         return null;
     }
 
     // If user is associated with a business, check the business's status
-    if (userData.businessId) {
+    if (userData?.businessId) {
         try {
             const businessRef = adminFirestore.collection('businesses').doc(userData.businessId);
             const businessSnap = await businessRef.get();
