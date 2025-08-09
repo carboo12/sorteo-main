@@ -7,30 +7,16 @@ const USER_KEY = 'app_user';
 
 export function login(user: AppUser) {
   if (typeof window !== 'undefined') {
+    // The browser will automatically dispatch a 'storage' event to other tabs.
+    // Manually dispatching it was causing an infinite loop in the same tab.
     localStorage.setItem(USER_KEY, JSON.stringify(user));
-    // Dispatch a storage event to notify other tabs/windows
-    window.dispatchEvent(
-        new StorageEvent('storage', {
-            key: USER_KEY,
-            newValue: JSON.stringify(user),
-        })
-    );
   }
 }
 
 export function signOutUser() {
   if (typeof window !== 'undefined') {
-    const wasPresent = localStorage.getItem(USER_KEY);
+    // The browser will automatically dispatch a 'storage' event to other tabs.
     localStorage.removeItem(USER_KEY);
-     // Dispatch a storage event to notify other tabs/windows
-     if (wasPresent) {
-        window.dispatchEvent(
-            new StorageEvent('storage', {
-                key: USER_KEY,
-                newValue: null,
-            })
-        );
-     }
   }
 }
 
