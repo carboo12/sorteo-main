@@ -24,7 +24,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { toast } = useToast();
 
   const signOut = useCallback(async (isTimeout = false) => {
-    if (isTimeout && user) {
+    const userToLogOut = user;
+
+    if (isTimeout && userToLogOut) {
         toast({
             title: 'Sesión Expirada',
             description: 'Tu sesión ha expirado por inactividad. Por favor, inicia sesión de nuevo.',
@@ -32,8 +34,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
     }
     
-    if (user && !isTimeout) {
-        await logEvent(user, 'logout', 'user', 'User logged out.');
+    if (userToLogOut && !isTimeout) {
+        await logEvent(userToLogOut, 'logout', 'user', 'User logged out.');
     }
     try {
         await auth.signOut();
@@ -41,7 +43,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.error("Error signing out:", error);
     } finally {
         setUser(null);
-        // Redirect to login to ensure clean state
         if (typeof window !== 'undefined') {
             window.location.href = '/login';
         }
@@ -56,7 +57,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 const appUser = await getOrCreateUser(firebaseUser.uid, firebaseUser.email);
 
                 if (appUser) {
-                    if (!user) { 
+                    if (appUser.uid !== user?.uid) { // Check if it's a new login
                          await logEvent(appUser, 'login', 'user', 'User logged in successfully.');
                     }
                     setUser(appUser);
@@ -76,7 +77,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     return () => unsubscribe();
-  }, [user]);
+  }, []); // Empty dependency array ensures this runs only once
 
    useEffect(() => {
     if (typeof window === 'undefined' || !user) {
