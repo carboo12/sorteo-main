@@ -70,6 +70,24 @@ export async function logEvent(
     }
 }
 
+const docToEventLog = (doc: admin.firestore.DocumentSnapshot): EventLog => {
+    const data = doc.data() as any;
+    return {
+        id: doc.id,
+        ...data,
+        timestamp: data.timestamp.toDate ? data.timestamp.toDate().toISOString() : data.timestamp,
+    } as EventLog;
+};
+
+const docToErrorLog = (doc: admin.firestore.DocumentSnapshot): ErrorLog => {
+    const data = doc.data() as any;
+    return {
+        id: doc.id,
+        ...data,
+        timestamp: data.timestamp.toDate ? data.timestamp.toDate().toISOString() : data.timestamp,
+    } as ErrorLog;
+}
+
 export async function getEventLogs(requestingUser: AppUser): Promise<EventLog[]> {
     try {
         let query: admin.firestore.Query = adminFirestore.collection('event_logs');
@@ -84,7 +102,7 @@ export async function getEventLogs(requestingUser: AppUser): Promise<EventLog[]>
         if (snapshot.empty) {
             return [];
         }
-        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EventLog));
+        return snapshot.docs.map(docToEventLog);
 
     } catch (error) {
         console.error("Error fetching event logs:", error);
@@ -100,18 +118,18 @@ export async function getErrorLogs(requestingUser: AppUser): Promise<ErrorLog[]>
         if (requestingUser.role === 'superuser') {
             // Fetch global errors
             const globalSnapshot = await adminFirestore.collection('global_error_logs').orderBy('timestamp', 'desc').limit(50).get();
-            logs = logs.concat(globalSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ErrorLog)));
+            logs = logs.concat(globalSnapshot.docs.map(docToErrorLog));
 
             // Fetch errors from all businesses
             const businessesSnapshot = await adminFirestore.collection('businesses').get();
             for (const businessDoc of businessesSnapshot.docs) {
                 const businessErrorsSnapshot = await businessDoc.ref.collection('error_logs').orderBy('timestamp', 'desc').limit(20).get();
-                logs = logs.concat(businessErrorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ErrorLog)));
+                logs = logs.concat(businessErrorsSnapshot.docs.map(docToErrorLog));
             }
 
         } else if (requestingUser.role === 'admin' && requestingUser.businessId) {
             const businessErrorsSnapshot = await adminFirestore.collection(`businesses/${requestingUser.businessId}/error_logs`).orderBy('timestamp', 'desc').limit(100).get();
-            logs = businessErrorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ErrorLog));
+            logs = businessErrorsSnapshot.docs.map(docToErrorLog);
         }
 
         // Sort all collected logs by timestamp descending
@@ -530,10 +548,18 @@ export async function getWinnerHistory(businessId: string): Promise<Winner[]> {
   const businessDoc = await adminFirestore.collection('businesses').doc(businessId).get();
   if (businessDoc.exists) {
     const data = businessDoc.data();
-    // Sort by drawnAt date descending
-    return (data?.winnerHistory || []).sort((a: Winner, b: Winner) => {
-        return new Date(b.drawnAt).getTime() - new Date(a.drawnAt).getTime();
-    });
+    const history = data?.winnerHistory || [];
+    
+    // Sort and serialize timestamps
+    return history
+        .map((winner: any) => ({
+            ...winner,
+            drawnAt: winner.drawnAt.toDate ? winner.drawnAt.toDate().toISOString() : winner.drawnAt,
+            claimedAt: winner.claimedAt ? (winner.claimedAt.toDate ? winner.claimedAt.toDate().toISOString() : winner.claimedAt) : undefined,
+        }))
+        .sort((a: Winner, b: Winner) => {
+            return new Date(b.drawnAt).getTime() - new Date(a.drawnAt).getTime();
+        });
   }
   return [];
 }
