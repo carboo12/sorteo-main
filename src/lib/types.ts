@@ -80,6 +80,7 @@ export interface FinancialSettings {
     ticketPrice: number;
     totalTickets: number;
     ticketSelectionMode: 'manual' | 'random';
+    drawEffectDuration: number;
 }
 
 export interface TurnosSettings {

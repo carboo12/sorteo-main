@@ -620,6 +620,7 @@ export async function getBusinessSettings(businessId: string): Promise<BusinessS
                 ...data,
                 // Provide default for new setting if it doesn't exist
                 ticketSelectionMode: data?.ticketSelectionMode || 'manual',
+                drawEffectDuration: data?.drawEffectDuration || 3,
             } as BusinessSettings;
         }
         // Return default settings if none exist
@@ -629,6 +630,7 @@ export async function getBusinessSettings(businessId: string): Promise<BusinessS
             ticketPrice: 10,
             totalTickets: 100,
             ticketSelectionMode: 'manual',
+            drawEffectDuration: 3,
             turnos: {
                 turno1: { enabled: true, drawTime: '11:00', prize: 'Premio Mañana' },
                 turno2: { enabled: true, drawTime: '15:00', prize: 'Premio Tarde' },

@@ -172,7 +172,7 @@ export default function RaffleClient() {
   const runTumbleEffect = async () => {
     setIsSpinning(true);
     const totalTickets = settings?.totalTickets || 100;
-    const spinDuration = 3000; // 3 seconds
+    const spinDuration = (settings?.drawEffectDuration || 3) * 1000;
     const intervalTime = 100; // update every 100ms
     let spinInterval: NodeJS.Timeout;
 
@@ -436,5 +436,3 @@ export default function RaffleClient() {
     </div>
   );
 }
-
-    

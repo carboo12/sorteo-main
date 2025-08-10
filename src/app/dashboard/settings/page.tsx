@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { Loader2, DollarSign, Clock, AlertCircle, Ticket, Shuffle } from "lucide-react";
+import { Loader2, DollarSign, Clock, AlertCircle, Ticket, Shuffle, Timer } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/use-auth';
 import { getBusinessSettings, updateBusinessFinancialSettings, updateBusinessTurnosSettings } from '@/lib/actions';
@@ -24,6 +24,7 @@ const financialSettingsSchema = z.object({
   ticketPrice: z.coerce.number().nonnegative({ message: "El precio del número no puede ser negativo." }),
   totalTickets: z.coerce.number().int().positive({ message: "La cantidad de números debe ser un entero positivo." }),
   ticketSelectionMode: z.enum(['manual', 'random'], { required_error: 'Debe seleccionar un modo de venta.'}),
+  drawEffectDuration: z.coerce.number().int().min(1, "La duración debe ser de al menos 1 segundo.").max(10, "La duración no puede exceder los 10 segundos."),
 });
 
 // Schema for the turnos settings form
@@ -85,7 +86,7 @@ export default function SettingsPage() {
 
     const financialForm = useForm<FinancialFormValues>({
         resolver: zodResolver(financialSettingsSchema),
-        defaultValues: { exchangeRateUSDToNIO: 0, ticketPrice: 0, totalTickets: 100, ticketSelectionMode: 'manual' }
+        defaultValues: { exchangeRateUSDToNIO: 0, ticketPrice: 0, totalTickets: 100, ticketSelectionMode: 'manual', drawEffectDuration: 3 }
     });
 
     const turnosForm = useForm<TurnosFormValues>({
@@ -113,6 +114,7 @@ export default function SettingsPage() {
                             ticketPrice: settings.ticketPrice,
                             totalTickets: settings.totalTickets || 100,
                             ticketSelectionMode: settings.ticketSelectionMode || 'manual',
+                            drawEffectDuration: settings.drawEffectDuration || 3,
                         });
                         turnosForm.reset({
                             turnos: settings.turnos
@@ -244,6 +246,18 @@ export default function SettingsPage() {
                                                 </FormItem>
                                             )}
                                             />
+                                        <FormField 
+                                            control={financialForm.control} 
+                                            name="drawEffectDuration" 
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Duración del Efecto de Sorteo (segundos)</FormLabel>
+                                                    <FormControl><Input type="number" placeholder="Ej: 3" {...field} /></FormControl>
+                                                    <FormDescription>El tiempo que dura la animación de la ruleta antes de mostrar el ganador (1-10 seg).</FormDescription>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )} 
+                                        />
                                     </div>
                                 </CardContent>
                                 <CardFooter className="flex justify-end p-4 border-t">
