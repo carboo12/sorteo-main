@@ -155,13 +155,14 @@ export default function RaffleClient() {
   
   const runTumbleEffect = async () => {
     setIsSpinning(true);
+    const totalTickets = settings?.totalTickets || 100;
     const spinDuration = 3000; // 3 seconds
     const intervalTime = 100; // update every 100ms
     let spinInterval: NodeJS.Timeout;
 
     return new Promise<void>((resolve) => {
       spinInterval = setInterval(() => {
-        const randomNumber = Math.floor(Math.random() * 100) + 1;
+        const randomNumber = Math.floor(Math.random() * totalTickets) + 1;
         setHighlightedNumber(randomNumber);
       }, intervalTime);
 
@@ -195,6 +196,7 @@ export default function RaffleClient() {
   
   const canDraw = userRole === 'admin' || userRole === 'superuser';
   const isCurrentTurnoEnabled = turnoInfo && settings?.turnos ? settings.turnos[turnoInfo.turno].enabled : false;
+  const totalTickets = settings?.totalTickets || 100;
 
   if (authLoading || (isLoading && businessId)) {
     return (
@@ -248,7 +250,7 @@ export default function RaffleClient() {
                 </div>
               ) : (
                 <div className="grid grid-cols-10 gap-2">
-                  {Array.from({ length: 100 }, (_, i) => i + 1).map((number) => {
+                  {Array.from({ length: totalTickets }, (_, i) => i + 1).map((number) => {
                     const isSold = soldNumbers.has(number);
                     const isWinner = number === turnoData.winningNumber;
                     const isHighlighted = number === highlightedNumber;

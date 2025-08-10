@@ -78,6 +78,7 @@ export interface UserUpdateData {
 export interface FinancialSettings {
     exchangeRateUSDToNIO: number;
     ticketPrice: number;
+    totalTickets: number;
 }
 
 export interface TurnosSettings {

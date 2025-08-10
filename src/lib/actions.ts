@@ -75,7 +75,7 @@ const docToEventLog = (doc: admin.firestore.DocumentSnapshot): EventLog => {
     return {
         id: doc.id,
         ...data,
-        timestamp: data.timestamp.toDate ? data.timestamp.toDate().toISOString() : data.timestamp,
+        timestamp: data.timestamp,
     } as EventLog;
 };
 
@@ -84,7 +84,7 @@ const docToErrorLog = (doc: admin.firestore.DocumentSnapshot): ErrorLog => {
     return {
         id: doc.id,
         ...data,
-        timestamp: data.timestamp.toDate ? data.timestamp.toDate().toISOString() : data.timestamp,
+        timestamp: data.timestamp,
     } as ErrorLog;
 }
 
@@ -146,73 +146,86 @@ export async function getErrorLogs(requestingUser: AppUser): Promise<ErrorLog[]>
 
 
 export async function getOrCreateUser(
-    uid: string, 
-    email: string | null
-): Promise<{ user: AppUser | null; isFirstLogin: boolean }> {
-    const userRef = adminFirestore.collection('users').doc(uid);
-    let userSnap = await userRef.get();
-    let isFirstLogin = false;
+  uid: string,
+  email: string | null
+): Promise<{ user: AppUser; isFirstLogin: boolean } | null> {
+  const userRef = adminFirestore.collection('users').doc(uid);
+  let userSnap = await userRef.get();
+  let isFirstLogin = false;
 
-    if (!userSnap.exists) {
-        isFirstLogin = true;
-        // Superuser creation on first login
-        if (email === 'carboo12@gmail.com') {
-            console.log(`First login for superuser ${email}. Creating user document.`);
-            const superUserData: AppUser = {
-                uid,
-                email,
-                name: 'Super User',
-                role: 'superuser',
-                businessId: null,
-            };
-            await userRef.set(superUserData);
-            return { user: superUserData, isFirstLogin: true };
-        }
-        console.warn(`User with UID ${uid} not found in Firestore and is not superuser.`);
-        return { user: null, isFirstLogin: false };
-    }
-    
-    const userData = userSnap.data() as AppUser;
-
-    // This ensures your account always has superuser privileges, overriding DB value if necessary
+  if (!userSnap.exists) {
+    isFirstLogin = true;
     if (email === 'carboo12@gmail.com') {
-        userData.role = 'superuser';
+      const superUserData: AppUser = {
+        uid,
+        email,
+        name: 'Super User',
+        role: 'superuser',
+        businessId: null,
+      };
+      await userRef.set(superUserData);
+      return { user: superUserData, isFirstLogin: true };
     }
-    
-    if (userData.disabled) {
-        await logError('Login attempt by disabled user', { userId: uid }, userData.businessId);
-        // No need to disable in Auth again, as getOrCreateUser isn't called if user is disabled in Auth
-        return { user: null, isFirstLogin: false };
-    }
+    return null;
+  }
 
-    if (userData.businessId) {
-        try {
-            const businessRef = adminFirestore.collection('businesses').doc(userData.businessId);
-            const businessSnap = await businessRef.get();
+  const userData = userSnap.data() as AppUser;
 
-            if (!businessSnap.exists) {
-                await logError('Login attempt by user with non-existent business', { userId: uid, businessId: userData.businessId }, userData.businessId);
-                return { user: null, isFirstLogin: false };
-            }
+  if (email === 'carboo12@gmail.com') {
+    userData.role = 'superuser';
+  }
 
-            const businessData = businessSnap.data() as Business;
-            const now = new Date();
-            const licenseExpiresAt = new Date(businessData.licenseExpiresAt);
+  if (userData.disabled) {
+    await logError(
+      'Login attempt by disabled user',
+      { userId: uid },
+      userData.businessId
+    );
+    return null;
+  }
 
-            if (businessData.disabled || licenseExpiresAt < now) {
-                if (licenseExpiresAt < now && !businessData.disabled) {
-                    await businessRef.update({ disabled: true });
-                }
-                await logError('Login attempt for disabled or expired business', { userId: uid, businessId: userData.businessId }, userData.businessId);
-                return { user: null, isFirstLogin: false };
-            }
-        } catch(e) {
-             await logError('Error checking business status during login', e, userData.businessId);
-             return { user: null, isFirstLogin: false };
+  if (userData.businessId) {
+    try {
+      const businessRef = adminFirestore
+        .collection('businesses')
+        .doc(userData.businessId);
+      const businessSnap = await businessRef.get();
+
+      if (!businessSnap.exists) {
+        await logError(
+          'Login attempt by user with non-existent business',
+          { userId: uid, businessId: userData.businessId },
+          userData.businessId
+        );
+        return null;
+      }
+
+      const businessData = businessSnap.data() as Business;
+      const now = new Date();
+      const licenseExpiresAt = new Date(businessData.licenseExpiresAt);
+
+      if (businessData.disabled || licenseExpiresAt < now) {
+        if (licenseExpiresAt < now && !businessData.disabled) {
+          await businessRef.update({ disabled: true });
         }
+        await logError(
+          'Login attempt for disabled or expired business',
+          { userId: uid, businessId: userData.businessId },
+          userData.businessId
+        );
+        return null;
+      }
+    } catch (e) {
+      await logError(
+        'Error checking business status during login',
+        e,
+        userData.businessId
+      );
+      return null;
     }
-    
-    return { user: userData, isFirstLogin };
+  }
+
+  return { user: userData, isFirstLogin };
 }
 
 
@@ -537,8 +550,9 @@ export async function drawWinner(turnoInfo: TurnoInfo, businessId: string, drawe
     if (settings && settings.turnos) {
         prizeForTurno = settings.turnos[turnoInfo.turno].prize || prizeForTurno;
     }
+    const totalTickets = settings?.totalTickets || 100;
 
-    const winningNumber = Math.floor(Math.random() * 100) + 1;
+    const winningNumber = Math.floor(Math.random() * totalTickets) + 1;
 
     if (winningNumber === undefined) {
         throw new Error('No se pudo generar un número ganador.');
@@ -598,8 +612,8 @@ export async function getWinnerHistory(businessId: string): Promise<Winner[]> {
     return history
         .map((winner: any) => ({
             ...winner,
-            drawnAt: winner.drawnAt.toDate ? winner.drawnAt.toDate().toISOString() : winner.drawnAt,
-            claimedAt: winner.claimedAt ? (winner.claimedAt.toDate ? winner.claimedAt.toDate().toISOString() : winner.claimedAt) : undefined,
+            drawnAt: winner.drawnAt,
+            claimedAt: winner.claimedAt,
         }))
         .sort((a: Winner, b: Winner) => {
             return new Date(b.drawnAt).getTime() - new Date(a.drawnAt).getTime();
@@ -622,6 +636,7 @@ export async function getBusinessSettings(businessId: string): Promise<BusinessS
             id: businessId,
             exchangeRateUSDToNIO: 36.5,
             ticketPrice: 10,
+            totalTickets: 100,
             turnos: {
                 turno1: { enabled: true, drawTime: '11:00', prize: 'Premio Mañana' },
                 turno2: { enabled: true, drawTime: '15:00', prize: 'Premio Tarde' },
