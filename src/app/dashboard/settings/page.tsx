@@ -9,19 +9,21 @@ import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { Loader2, DollarSign, Clock, AlertCircle, Ticket } from "lucide-react";
+import { Loader2, DollarSign, Clock, AlertCircle, Ticket, Shuffle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/hooks/use-auth';
 import { getBusinessSettings, updateBusinessFinancialSettings, updateBusinessTurnosSettings } from '@/lib/actions';
 import type { BusinessSettings, FinancialSettings, TurnosSettings } from '@/lib/types';
 import DashboardLayout from '@/components/dashboard-layout';
 import { Switch } from '@/components/ui/switch';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 // Schema for the financial settings form
 const financialSettingsSchema = z.object({
   exchangeRateUSDToNIO: z.coerce.number().positive({ message: "La tasa de cambio debe ser un número positivo." }),
   ticketPrice: z.coerce.number().nonnegative({ message: "El precio del número no puede ser negativo." }),
   totalTickets: z.coerce.number().int().positive({ message: "La cantidad de números debe ser un entero positivo." }),
+  ticketSelectionMode: z.enum(['manual', 'random'], { required_error: 'Debe seleccionar un modo de venta.'}),
 });
 
 // Schema for the turnos settings form
@@ -83,7 +85,7 @@ export default function SettingsPage() {
 
     const financialForm = useForm<FinancialFormValues>({
         resolver: zodResolver(financialSettingsSchema),
-        defaultValues: { exchangeRateUSDToNIO: 0, ticketPrice: 0, totalTickets: 100 }
+        defaultValues: { exchangeRateUSDToNIO: 0, ticketPrice: 0, totalTickets: 100, ticketSelectionMode: 'manual' }
     });
 
     const turnosForm = useForm<TurnosFormValues>({
@@ -110,6 +112,7 @@ export default function SettingsPage() {
                             exchangeRateUSDToNIO: settings.exchangeRateUSDToNIO,
                             ticketPrice: settings.ticketPrice,
                             totalTickets: settings.totalTickets || 100,
+                            ticketSelectionMode: settings.ticketSelectionMode || 'manual',
                         });
                         turnosForm.reset({
                             turnos: settings.turnos
@@ -203,10 +206,44 @@ export default function SettingsPage() {
                             <Card>
                                 <CardHeader><div className="flex items-start gap-4"><DollarSign className="h-8 w-8 text-primary mt-1" /><div className='flex-1'><h3 className="text-lg font-semibold">Configuración Financiera y de Sorteo</h3><p className="text-sm text-muted-foreground">Define precios, tasas y la cantidad de números para el sorteo.</p></div></div></CardHeader>
                                 <CardContent>
-                                    <div className="grid md:grid-cols-2 gap-6 pl-12">
+                                    <div className="grid md:grid-cols-2 gap-8 pl-12">
                                         <FormField control={financialForm.control} name="exchangeRateUSDToNIO" render={({ field }) => (<FormItem><FormLabel>Tasa de Cambio (USD a NIO)</FormLabel><FormControl><Input type="number" step="0.01" placeholder="Ej: 36.50" {...field} /></FormControl><FormDescription>1 Dólar Americano (USD) equivale a X Córdobas (NIO).</FormDescription><FormMessage /></FormItem>)} />
                                         <FormField control={financialForm.control} name="ticketPrice" render={({ field }) => (<FormItem><FormLabel>Precio del Número (NIO)</FormLabel><FormControl><Input type="number" placeholder="Ej: 10" {...field} /></FormControl><FormDescription>El costo de cada número. Poner 0 si es gratis.</FormDescription><FormMessage /></FormItem>)} />
                                         <FormField control={financialForm.control} name="totalTickets" render={({ field }) => (<FormItem><FormLabel>Cantidad de Números del Sorteo</FormLabel><FormControl><Input type="number" placeholder="Ej: 100" {...field} /></FormControl><FormDescription>La cantidad total de números disponibles en la rifa (ej. 100, 200, etc.).</FormDescription><FormMessage /></FormItem>)} />
+                                        <FormField
+                                            control={financialForm.control}
+                                            name="ticketSelectionMode"
+                                            render={({ field }) => (
+                                                <FormItem className="space-y-3">
+                                                <FormLabel>Modo de Selección de Números</FormLabel>
+                                                <FormControl>
+                                                    <RadioGroup
+                                                    onValueChange={field.onChange}
+                                                    defaultValue={field.value}
+                                                    className="flex flex-col space-y-1"
+                                                    >
+                                                    <FormItem className="flex items-center space-x-3 space-y-0">
+                                                        <FormControl>
+                                                        <RadioGroupItem value="manual" />
+                                                        </FormControl>
+                                                        <FormLabel className="font-normal">
+                                                            Manual (el vendedor elige el número)
+                                                        </FormLabel>
+                                                    </FormItem>
+                                                    <FormItem className="flex items-center space-x-3 space-y-0">
+                                                        <FormControl>
+                                                        <RadioGroupItem value="random" />
+                                                        </FormControl>
+                                                        <FormLabel className="font-normal">
+                                                            Aleatorio (el sistema asigna un número)
+                                                        </FormLabel>
+                                                    </FormItem>
+                                                    </RadioGroup>
+                                                </FormControl>
+                                                <FormMessage />
+                                                </FormItem>
+                                            )}
+                                            />
                                     </div>
                                 </CardContent>
                                 <CardFooter className="flex justify-end p-4 border-t">
@@ -261,5 +298,3 @@ export default function SettingsPage() {
         </DashboardLayout>
     );
 }
-
-    

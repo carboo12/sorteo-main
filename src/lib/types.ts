@@ -79,6 +79,7 @@ export interface FinancialSettings {
     exchangeRateUSDToNIO: number;
     ticketPrice: number;
     totalTickets: number;
+    ticketSelectionMode: 'manual' | 'random';
 }
 
 export interface TurnosSettings {

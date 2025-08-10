@@ -17,7 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { getTurnoData, buyTicket, drawWinner, getWinnerHistory, getBusinessById, getBusinessSettings } from '@/lib/actions';
 import { getCurrentTurno, cn } from '@/lib/utils';
 import type { TurnoData, Winner, TurnoInfo, Ticket, Business, BusinessSettings } from '@/lib/types';
-import { Loader2, Ticket as TicketIcon, Trophy, User, Calendar, Clock, Sparkles, Gift, Printer, Ban } from 'lucide-react';
+import { Loader2, Ticket as TicketIcon, Trophy, User, Calendar, Clock, Sparkles, Gift, Printer, Ban, Shuffle } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
@@ -112,6 +112,22 @@ export default function RaffleClient() {
     setIsPurchaseDialogOpen(true);
     form.reset();
   };
+  
+  const handleRandomSale = () => {
+    if (!settings || soldNumbers.size >= settings.totalTickets) {
+      toast({ variant: 'destructive', title: 'Agotado', description: 'Todos los números han sido vendidos.' });
+      return;
+    }
+
+    let randomNumber;
+    do {
+      randomNumber = Math.floor(Math.random() * settings.totalTickets) + 1;
+    } while (soldNumbers.has(randomNumber));
+
+    setSelectedNumber(randomNumber);
+    setIsPurchaseDialogOpen(true);
+    form.reset();
+  }
 
   const handleBuyTicket = async (values: z.infer<typeof buyTicketSchema>) => {
     if (!selectedNumber || !turnoInfo || !businessId || !user) return;
@@ -197,6 +213,7 @@ export default function RaffleClient() {
   const canDraw = userRole === 'admin' || userRole === 'superuser';
   const isCurrentTurnoEnabled = turnoInfo && settings?.turnos ? settings.turnos[turnoInfo.turno].enabled : false;
   const totalTickets = settings?.totalTickets || 100;
+  const selectionMode = settings?.ticketSelectionMode || 'manual';
 
   if (authLoading || (isLoading && businessId)) {
     return (
@@ -229,7 +246,7 @@ export default function RaffleClient() {
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                      <CardTitle className="flex items-center gap-3 text-2xl">
                         <Sparkles className="text-primary" />
-                        <span>Selecciona tu número</span>
+                        <span>{selectionMode === 'manual' ? 'Selecciona tu número' : 'Venta de Números'}</span>
                     </CardTitle>
                     {turnoInfo && (
                         <div className="text-sm font-medium text-muted-foreground flex items-center gap-4">
@@ -248,7 +265,7 @@ export default function RaffleClient() {
                         El sorteo para este turno no está activo en este momento.
                     </p>
                 </div>
-              ) : (
+              ) : selectionMode === 'manual' ? (
                 <div className="grid grid-cols-10 gap-2">
                   {Array.from({ length: totalTickets }, (_, i) => i + 1).map((number) => {
                     const isSold = soldNumbers.has(number);
@@ -272,6 +289,21 @@ export default function RaffleClient() {
                       </Button>
                     );
                   })}
+                </div>
+                ) : (
+                 <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-lg text-center min-h-[300px]">
+                    <h3 className="text-xl font-semibold mb-4">Modo de Venta Aleatoria Activo</h3>
+                    <p className="text-muted-foreground mb-6">
+                        El sistema asignará un número disponible al azar al vender un ticket.
+                    </p>
+                    <Button 
+                        size="lg" 
+                        onClick={handleRandomSale}
+                        disabled={!!turnoData.winningNumber || isDrawing || soldNumbers.size >= totalTickets}
+                    >
+                        <Shuffle className="mr-2 h-5 w-5" />
+                        Vender Número Aleatorio
+                    </Button>
                 </div>
                 )}
             </CardContent>

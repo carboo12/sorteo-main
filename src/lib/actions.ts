@@ -149,83 +149,68 @@ export async function getOrCreateUser(
   uid: string,
   email: string | null
 ): Promise<{ user: AppUser; isFirstLogin: boolean } | null> {
-  const userRef = adminFirestore.collection('users').doc(uid);
-  let userSnap = await userRef.get();
-  let isFirstLogin = false;
-
-  if (!userSnap.exists) {
-    isFirstLogin = true;
-    if (email === 'carboo12@gmail.com') {
-      const superUserData: AppUser = {
-        uid,
-        email,
-        name: 'Super User',
-        role: 'superuser',
-        businessId: null,
-      };
-      await userRef.set(superUserData);
-      return { user: superUserData, isFirstLogin: true };
-    }
-    return null;
-  }
-
-  const userData = userSnap.data() as AppUser;
-
-  if (email === 'carboo12@gmail.com') {
-    userData.role = 'superuser';
-  }
-
-  if (userData.disabled) {
-    await logError(
-      'Login attempt by disabled user',
-      { userId: uid },
-      userData.businessId
-    );
-    return null;
-  }
-
-  if (userData.businessId) {
-    try {
-      const businessRef = adminFirestore
-        .collection('businesses')
-        .doc(userData.businessId);
-      const businessSnap = await businessRef.get();
-
-      if (!businessSnap.exists) {
-        await logError(
-          'Login attempt by user with non-existent business',
-          { userId: uid, businessId: userData.businessId },
-          userData.businessId
-        );
-        return null;
-      }
-
-      const businessData = businessSnap.data() as Business;
-      const now = new Date();
-      const licenseExpiresAt = new Date(businessData.licenseExpiresAt);
-
-      if (businessData.disabled || licenseExpiresAt < now) {
-        if (licenseExpiresAt < now && !businessData.disabled) {
-          await businessRef.update({ disabled: true });
+    const userRef = adminFirestore.collection('users').doc(uid);
+    let userSnap = await userRef.get();
+    let isFirstLogin = false;
+    
+    // First time login for a user that doesn't exist in our DB
+    if (!userSnap.exists) {
+        isFirstLogin = true;
+        // The first user ever is the superuser
+        if (email === 'carboo12@gmail.com') {
+            const superUserData: AppUser = {
+                uid,
+                email,
+                name: 'Super User',
+                role: 'superuser',
+                businessId: null,
+            };
+            await userRef.set(superUserData);
+            return { user: superUserData, isFirstLogin: true };
         }
-        await logError(
-          'Login attempt for disabled or expired business',
-          { userId: uid, businessId: userData.businessId },
-          userData.businessId
-        );
+        // Any other user must be created manually, so if they log in and don't exist, deny access.
         return null;
-      }
-    } catch (e) {
-      await logError(
-        'Error checking business status during login',
-        e,
-        userData.businessId
-      );
-      return null;
-    }
-  }
+    } 
 
-  return { user: userData, isFirstLogin };
+    const userData = userSnap.data() as AppUser;
+    
+    // Ensure the superuser role is always correct on login
+    if (email === 'carboo12@gmail.com') {
+        userData.role = 'superuser';
+    }
+
+    // Block disabled users
+    if (userData.disabled) {
+        await logError('Login attempt by disabled user', { userId: uid }, userData.businessId);
+        throw new Error("Tu cuenta ha sido inhabilitada. Contacta al administrador.");
+    }
+
+    // Block users of disabled businesses
+    if (userData.businessId) {
+        try {
+            const businessRef = adminFirestore.collection('businesses').doc(userData.businessId);
+            const businessSnap = await businessRef.get();
+            if (!businessSnap.exists) {
+                await logError('Login attempt by user with non-existent business', { userId: uid, businessId: userData.businessId }, userData.businessId);
+                throw new Error("El negocio asociado a tu cuenta ya no existe.");
+            }
+            const businessData = businessSnap.data() as Business;
+            const now = new Date();
+            const licenseExpiresAt = new Date(businessData.licenseExpiresAt);
+            if (businessData.disabled || licenseExpiresAt < now) {
+                if (licenseExpiresAt < now && !businessData.disabled) {
+                    await businessRef.update({ disabled: true }); // Auto-disable if expired
+                }
+                await logError('Login attempt for disabled or expired business', { userId: uid, businessId: userData.businessId }, userData.businessId);
+                throw new Error("El negocio asociado a tu cuenta está deshabilitado o su licencia ha expirado.");
+            }
+        } catch (e: any) {
+            await logError('Error checking business status during login', e, userData.businessId);
+            throw e; // Re-throw the original error
+        }
+    }
+
+    return { user: userData, isFirstLogin };
 }
 
 
@@ -629,7 +614,13 @@ export async function getBusinessSettings(businessId: string): Promise<BusinessS
         const docRef = adminFirestore.collection('business_settings').doc(businessId);
         const docSnap = await docRef.get();
         if (docSnap.exists) {
-            return { id: docSnap.id, ...docSnap.data() } as BusinessSettings;
+            const data = docSnap.data();
+            return {
+                id: docSnap.id,
+                ...data,
+                // Provide default for new setting if it doesn't exist
+                ticketSelectionMode: data?.ticketSelectionMode || 'manual',
+            } as BusinessSettings;
         }
         // Return default settings if none exist
         return {
@@ -637,6 +628,7 @@ export async function getBusinessSettings(businessId: string): Promise<BusinessS
             exchangeRateUSDToNIO: 36.5,
             ticketPrice: 10,
             totalTickets: 100,
+            ticketSelectionMode: 'manual',
             turnos: {
                 turno1: { enabled: true, drawTime: '11:00', prize: 'Premio Mañana' },
                 turno2: { enabled: true, drawTime: '15:00', prize: 'Premio Tarde' },
@@ -671,7 +663,7 @@ export async function updateBusinessTurnosSettings(businessId: string, settings:
         return { success: true, message: "Configuración de turnos guardada con éxito." };
     } catch (error: any) {
         console.error("Error updating turnos settings:", error);
-        await logError(`updateBusinessTurnosSettings failed for business ${businessId}`, error, businessId);
+        await logEvent(`updateBusinessTurnosSettings failed for business ${businessId}`, error, businessId);
         return { success: false, message: `Error al guardar la configuración: ${error.message}` };
     }
 }
