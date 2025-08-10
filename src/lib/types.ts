@@ -113,6 +113,5 @@ export interface ErrorLog {
     stack?: string;
     details?: string;
     businessId?: string | null;
+    businessName?: string | null;
 }
-
-    

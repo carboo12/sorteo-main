@@ -3,15 +3,19 @@
 'use server';
 
 import { adminFirestore, adminAuth, admin } from './firebase-admin-sdk';
-import type { AppUser, Business, Ticket, TurnoData, TurnoInfo, Winner, UserFormData, UserUpdateData, BusinessSettings, EventLog, FinancialSettings, TurnosSettings } from './types';
+import type { AppUser, Business, Ticket, TurnoData, TurnoInfo, Winner, UserFormData, UserUpdateData, BusinessSettings, EventLog, ErrorLog, FinancialSettings, TurnosSettings } from './types';
 
 
 export async function logError(context: string, error: any, businessId?: string | null): Promise<void> {
     try {
-        const errorData: any = {
+        const business = businessId ? await getBusinessById(businessId) : null;
+        
+        const errorData: Omit<ErrorLog, 'id'> = {
             context: context,
-            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+            timestamp: new Date().toISOString(),
             businessId: businessId || null,
+            businessName: business?.name || null,
+            errorMessage: 'Unknown Error',
         };
 
         if (error instanceof Error) {
@@ -19,15 +23,14 @@ export async function logError(context: string, error: any, businessId?: string 
             errorData.stack = error.stack;
         } else if (typeof error === 'object' && error !== null) {
             errorData.errorMessage = error.message || 'No message';
-            errorData.errorCode = error.code || null;
             errorData.stack = error.stack || null;
             errorData.details = JSON.stringify(error);
         } else {
             errorData.details = String(error);
         }
         
-        const collection = businessId ? `businesses/${businessId}/error_logs` : 'global_error_logs';
-        await adminFirestore.collection(collection).add(errorData);
+        const collectionPath = businessId ? `businesses/${businessId}/error_logs` : 'global_error_logs';
+        await adminFirestore.collection(collectionPath).add(errorData);
 
     } catch (loggingError) {
         console.error("FATAL: Could not write to error log.", loggingError);
@@ -86,6 +89,39 @@ export async function getEventLogs(requestingUser: AppUser): Promise<EventLog[]>
     } catch (error) {
         console.error("Error fetching event logs:", error);
         await logError("getEventLogs failed", error, requestingUser.businessId);
+        return [];
+    }
+}
+
+export async function getErrorLogs(requestingUser: AppUser): Promise<ErrorLog[]> {
+    try {
+        let logs: ErrorLog[] = [];
+
+        if (requestingUser.role === 'superuser') {
+            // Fetch global errors
+            const globalSnapshot = await adminFirestore.collection('global_error_logs').orderBy('timestamp', 'desc').limit(50).get();
+            logs = logs.concat(globalSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ErrorLog)));
+
+            // Fetch errors from all businesses
+            const businessesSnapshot = await adminFirestore.collection('businesses').get();
+            for (const businessDoc of businessesSnapshot.docs) {
+                const businessErrorsSnapshot = await businessDoc.ref.collection('error_logs').orderBy('timestamp', 'desc').limit(20).get();
+                logs = logs.concat(businessErrorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ErrorLog)));
+            }
+
+        } else if (requestingUser.role === 'admin' && requestingUser.businessId) {
+            const businessErrorsSnapshot = await adminFirestore.collection(`businesses/${requestingUser.businessId}/error_logs`).orderBy('timestamp', 'desc').limit(100).get();
+            logs = businessErrorsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ErrorLog));
+        }
+
+        // Sort all collected logs by timestamp descending
+        logs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+        return logs.slice(0, 150); // Return the most recent 150 errors total
+
+    } catch (error) {
+        console.error("Error fetching error logs:", error);
+        await logError("getErrorLogs failed", error, requestingUser.businessId);
         return [];
     }
 }
@@ -158,7 +194,7 @@ export async function getOrCreateUser(
         }
     }
     
-    return { user: userData, isFirstLogin: false };
+    return { user: userData, isFirstLogin };
 }
 
 
