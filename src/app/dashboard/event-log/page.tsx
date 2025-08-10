@@ -20,7 +20,7 @@ export default function EventLogPage() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!authLoading && user) {
+        if (!authLoading && user && (user.role === 'admin' || user.role === 'superuser')) {
             const fetchLogs = async () => {
                 setLoading(true);
                 try {
@@ -33,6 +33,8 @@ export default function EventLogPage() {
                 }
             };
             fetchLogs();
+        } else if (!authLoading) {
+            setLoading(false);
         }
     }, [user, authLoading]);
 
@@ -43,6 +45,7 @@ export default function EventLogPage() {
             case 'delete': return 'destructive';
             case 'login': return 'outline';
             case 'logout': return 'outline';
+            case 'claim': return 'default'; // Using 'default' which is often green-ish
             default: return 'secondary';
         }
     };
@@ -61,7 +64,14 @@ export default function EventLogPage() {
          return (
              <DashboardLayout>
                  <div className="flex-1 space-y-4 p-8 pt-6">
-                    <p>No tienes permiso para ver esta página.</p>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Acceso Denegado</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                             <p>No tienes permiso para ver esta página.</p>
+                        </CardContent>
+                    </Card>
                  </div>
             </DashboardLayout>
          );

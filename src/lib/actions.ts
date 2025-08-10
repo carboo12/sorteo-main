@@ -91,11 +91,17 @@ export async function getEventLogs(requestingUser: AppUser): Promise<EventLog[]>
 }
 
 
-export async function getOrCreateUser(uid: string, email: string | null): Promise<AppUser | null> {
+export async function getOrCreateUser(
+    uid: string, 
+    email: string | null,
+    onLoginCallback?: (user: AppUser, isFirstLogin: boolean) => Promise<void>
+): Promise<AppUser | null> {
     const userRef = adminFirestore.collection('users').doc(uid);
     let userSnap = await userRef.get();
+    let isFirstLogin = false;
 
     if (!userSnap.exists) {
+        isFirstLogin = true;
         // Superuser creation on first login
         if (email === 'carboo12@gmail.com') {
             console.log(`First login for superuser ${email}. Creating user document.`);
@@ -107,7 +113,9 @@ export async function getOrCreateUser(uid: string, email: string | null): Promis
                 businessId: null,
             };
             await userRef.set(superUserData);
-            await logEvent(superUserData, 'create', 'user', 'Superuser account auto-created.');
+            if (onLoginCallback) {
+                await onLoginCallback(superUserData, true);
+            }
             return superUserData;
         }
         console.warn(`User with UID ${uid} not found in Firestore and is not superuser.`);
@@ -152,6 +160,10 @@ export async function getOrCreateUser(uid: string, email: string | null): Promis
              await logError('Error checking business status during login', e, userData.businessId);
              return null;
         }
+    }
+    
+    if (onLoginCallback) {
+        await onLoginCallback(userData, isFirstLogin);
     }
     
     return userData;
