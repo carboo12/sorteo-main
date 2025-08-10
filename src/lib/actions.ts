@@ -93,9 +93,8 @@ export async function getEventLogs(requestingUser: AppUser): Promise<EventLog[]>
 
 export async function getOrCreateUser(
     uid: string, 
-    email: string | null,
-    onLoginCallback?: (user: AppUser, isFirstLogin: boolean) => Promise<void>
-): Promise<AppUser | null> {
+    email: string | null
+): Promise<{ user: AppUser | null; isFirstLogin: boolean }> {
     const userRef = adminFirestore.collection('users').doc(uid);
     let userSnap = await userRef.get();
     let isFirstLogin = false;
@@ -113,13 +112,10 @@ export async function getOrCreateUser(
                 businessId: null,
             };
             await userRef.set(superUserData);
-            if (onLoginCallback) {
-                await onLoginCallback(superUserData, true);
-            }
-            return superUserData;
+            return { user: superUserData, isFirstLogin: true };
         }
         console.warn(`User with UID ${uid} not found in Firestore and is not superuser.`);
-        return null;
+        return { user: null, isFirstLogin: false };
     }
     
     const userData = userSnap.data() as AppUser;
@@ -132,7 +128,7 @@ export async function getOrCreateUser(
     if (userData.disabled) {
         await logError('Login attempt by disabled user', { userId: uid }, userData.businessId);
         // No need to disable in Auth again, as getOrCreateUser isn't called if user is disabled in Auth
-        return null;
+        return { user: null, isFirstLogin: false };
     }
 
     if (userData.businessId) {
@@ -142,7 +138,7 @@ export async function getOrCreateUser(
 
             if (!businessSnap.exists) {
                 await logError('Login attempt by user with non-existent business', { userId: uid, businessId: userData.businessId }, userData.businessId);
-                return null;
+                return { user: null, isFirstLogin: false };
             }
 
             const businessData = businessSnap.data() as Business;
@@ -154,19 +150,15 @@ export async function getOrCreateUser(
                     await businessRef.update({ disabled: true });
                 }
                 await logError('Login attempt for disabled or expired business', { userId: uid, businessId: userData.businessId }, userData.businessId);
-                return null;
+                return { user: null, isFirstLogin: false };
             }
         } catch(e) {
              await logError('Error checking business status during login', e, userData.businessId);
-             return null;
+             return { user: null, isFirstLogin: false };
         }
     }
     
-    if (onLoginCallback) {
-        await onLoginCallback(userData, isFirstLogin);
-    }
-    
-    return userData;
+    return { user: userData, isFirstLogin: false };
 }
 
 
@@ -615,5 +607,3 @@ export async function claimPrize(
         return { success: false, message: error.message };
     }
 }
-
-    

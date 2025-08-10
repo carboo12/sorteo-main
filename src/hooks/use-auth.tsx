@@ -55,15 +55,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
         if (firebaseUser) {
             try {
-                const appUser = await getOrCreateUser(firebaseUser.uid, firebaseUser.email, async (newUser, isFirstLogin) => {
-                    if (isFirstLogin) {
-                        await logEvent(newUser, 'login', 'user', 'User logged in successfully.');
-                    }
-                });
+                const result = await getOrCreateUser(firebaseUser.uid, firebaseUser.email);
 
-                if (appUser) {
-                    if (!appUser.disabled) {
-                        setUser(appUser);
+                if (result && result.user) {
+                    if (!result.user.disabled) {
+                        setUser(result.user);
+                         if (result.isFirstLogin) {
+                            await logEvent(result.user, 'login', 'user', 'User logged in successfully for the first time.');
+                        }
                     } else {
                         toast({ variant: 'destructive', title: 'Cuenta Inhabilitada', description: 'Tu cuenta ha sido inhabilitada. Contacta al administrador.'});
                         await auth.signOut();
