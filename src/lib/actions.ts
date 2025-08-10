@@ -241,6 +241,50 @@ export async function updateBusiness(id: string, businessData: Omit<Business, 'i
     }
 }
 
+export async function toggleBusinessStatus(businessId: string, disabled: boolean, editor: AppUser): Promise<{ success: boolean, message: string }> {
+    if (editor.role !== 'superuser') {
+        return { success: false, message: 'No tienes permiso para realizar esta acción.' };
+    }
+
+    try {
+        const businessRef = adminFirestore.collection('businesses').doc(businessId);
+        
+        // Disable the business document
+        await businessRef.update({ disabled });
+
+        // Find all users associated with this business
+        const usersQuery = adminFirestore.collection('users').where('businessId', '==', businessId);
+        const usersSnapshot = await usersQuery.get();
+        
+        const batch = adminFirestore.batch();
+
+        for (const userDoc of usersSnapshot.docs) {
+            const userRef = adminFirestore.collection('users').doc(userDoc.id);
+            // Disable user in Firestore
+            batch.update(userRef, { disabled });
+            // Disable user in Firebase Auth
+            await adminAuth.updateUser(userDoc.id, { disabled });
+        }
+
+        await batch.commit();
+        
+        const action = disabled ? "deshabilitado" : "habilitado";
+        const actionVerb: EventLog['action'] = disabled ? 'delete' : 'update';
+        
+        const business = await getBusinessById(businessId);
+        await logEvent(editor, actionVerb, 'business', `${disabled ? 'Disabled' : 'Enabled'} business '${business?.name}' (ID: ${businessId})`, businessId);
+        
+        const userCount = usersSnapshot.size;
+        return { success: true, message: `Negocio ${action} y ${userCount} usuario(s) asociado(s) han sido ${action}s.` };
+
+    } catch (error: any) {
+        console.error(`Error toggling business status for ${businessId}:`, error);
+        await logError(`toggleBusinessStatus for business ${businessId}`, error, editor.businessId);
+        return { success: false, message: `Ocurrió un error: ${error.message}` };
+    }
+}
+
+
 export async function getBusinesses(businessId?: string | null): Promise<Business[]> {
     try {
         let query: admin.firestore.Query = adminFirestore.collection('businesses');
